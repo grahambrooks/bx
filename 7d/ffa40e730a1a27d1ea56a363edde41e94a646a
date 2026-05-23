@@ -1,0 +1,26 @@
+CLAUDE.md
+  s_7c02e3620b6ef8::t_87c1f95bc25f41 52
+  s_7c02e3620b6ef8::t_dfa01e0f3d16fc 65-69
+  s_7c02e3620b6ef8::t_4643766b434924 25,32,38,40-44,48
+README.md
+  s_7c02e3620b6ef8::t_be2c6a8ab1b514 121
+  s_7c02e3620b6ef8::t_89bd96bbe87cfa 82
+  s_7c02e3620b6ef8::t_b69e5fd4b64041 100-102,108,110-112
+  s_7c02e3620b6ef8::t_54a7b6a289c849 135-138
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "7dffa40e730a1a27d1ea56a363edde41e94a646a",
+  "prompts": {},
+  "sessions": {
+    "s_7c02e3620b6ef8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fc8d2210-5054-418a-9617-3f0df3691915",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Graham Brooks <graham@grahambrooks.com>"
+    }
+  }
+}
