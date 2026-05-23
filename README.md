@@ -58,6 +58,22 @@ Milestone 0 ships the foundation:
 - Exit-code and stdio passthrough (important for MCP stdio transport)
 - Clean error chain reporting
 
+Milestone 1:
+
+- `bx prune` — garbage-collect cache (`--keep N`, `--all`, `--dry-run`)
+- `.bx.toml` manifest with `bx add <spec>` and `bx ensure [--record]`
+- Archive checksum verification (SHA-256) enforced on fetch
+
+```sh
+bx add grahambrooks/symgraph@v2026.4.13   # pin + record sha
+bx ensure                                  # verify everything in .bx.toml
+bx ensure --record                         # backfill checksums for this platform
+```
+
+Verification is enforced on download. Cache hits trust the prior install
+(the lockfile-style "verify once on install" contract). Run `bx --refresh`
+to force re-fetch + re-verify.
+
 ## Roadmap
 
 | Milestone | Adds |

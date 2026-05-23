@@ -2,6 +2,7 @@
 
 use crate::asset;
 use crate::cache;
+use crate::checksum;
 use crate::error::{BxError, Result};
 use crate::github::{Asset, Resolved};
 use crate::platform::Platform;
@@ -12,20 +13,43 @@ use tokio::io::AsyncWriteExt;
 
 const USER_AGENT: &str = concat!("bx/", env!("CARGO_PKG_VERSION"));
 
+/// Result of a successful fetch + extract. Carries the computed archive
+/// SHA-256 so callers (e.g. `bx add` / `bx ensure --record`) can persist
+/// it to a `.bx.toml` manifest without re-hashing.
+pub struct Fetched {
+    pub binary: PathBuf,
+    pub archive_sha256: String,
+}
+
 /// Make sure the cache directory contains the binary we want, downloading
-/// and extracting if not. Returns the path to the resolved executable.
+/// and extracting if not. If `expected_sha256` is supplied, the archive is
+/// verified against it after download and a mismatch aborts the install.
 pub async fn ensure(
     resolved: &Resolved,
     platform: &Platform,
     cache_dir: &Path,
     spec: &Spec,
-) -> Result<PathBuf> {
+    expected_sha256: Option<&str>,
+) -> Result<Fetched> {
     let chosen = asset::select(platform, &resolved.tag, &resolved.release.assets)?;
     tracing::info!(asset = %chosen.name, "downloading");
 
     std::fs::create_dir_all(cache_dir)?;
     let tmp_dir = tempfile::tempdir_in(cache_dir.parent().unwrap_or(cache_dir))?;
     let downloaded = download(chosen, tmp_dir.path()).await?;
+
+    let archive_sha256 = checksum::sha256_hex(&downloaded)?;
+    if let Some(expected) = expected_sha256 {
+        if !checksum::equal(expected, &archive_sha256) {
+            return Err(BxError::ChecksumMismatch {
+                expected: expected.to_string(),
+                actual: archive_sha256,
+                asset: chosen.name.clone(),
+            });
+        }
+        tracing::debug!(asset = %chosen.name, "checksum verified");
+    }
+
     extract_or_place(&downloaded, &chosen.name, cache_dir)?;
 
     let preferred_name = spec.binary.as_deref().unwrap_or(&spec.repo);
@@ -33,7 +57,11 @@ pub async fn ensure(
     // tar's unpack faithfully preserves that and find_binary then rejects
     // the file. Repair the exec bit here so `bx` Just Works on those.
     ensure_target_executable(cache_dir, preferred_name)?;
-    cache::find_binary(cache_dir, preferred_name)
+    let binary = cache::find_binary(cache_dir, preferred_name)?;
+    Ok(Fetched {
+        binary,
+        archive_sha256,
+    })
 }
 
 #[cfg(unix)]

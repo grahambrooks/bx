@@ -48,4 +48,14 @@ pub enum BxError {
 
     #[error("json error: {0}")]
     Json(#[from] serde_json::Error),
+
+    #[error("manifest error: {0}")]
+    Manifest(String),
+
+    #[error("checksum mismatch for {asset}: expected {expected}, got {actual}")]
+    ChecksumMismatch {
+        expected: String,
+        actual: String,
+        asset: String,
+    },
 }
