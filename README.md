@@ -1,14 +1,36 @@
 # bx (Binary Execute)
 
-bx is a missing primitive for running local binary STDIO MCP Servers. Similar to using npx/uvx/pipx but without the runtime dependencies for node or python.
-
-bc runs binaries from GitHub releases. An `npx` for compiled tools, with first-class MCP-server support.
+`bx` is a missing primitive for running local binary STDIO MCP servers —
+similar to `npx`/`uvx`/`pipx`, but without dragging in a Node or Python
+runtime. It fetches the right binary for your platform from a GitHub release,
+caches it, and execs it with full stdio passthrough.
 
 ```sh
 bx grahambrooks/symgraph -- --version          # latest release
 bx grahambrooks/symgraph@v2026.4.13 serve      # pinned tag
 bx grahambrooks/symgraph#cli -- foo            # named binary
 bx --refresh grahambrooks/symgraph serve       # ignore cache
+```
+
+## Install
+
+### Homebrew (macOS, Linux)
+
+```sh
+brew tap grahambrooks/bx https://github.com/grahambrooks/bx
+brew install bx
+```
+
+### From release
+
+Grab the right archive for your platform from the
+[latest release](https://github.com/grahambrooks/bx/releases/latest) and put
+`bx` on your `PATH`.
+
+### From source
+
+```sh
+cargo install --git https://github.com/grahambrooks/bx
 ```
 
 ## Why
@@ -74,9 +96,24 @@ src/
 ## Build and test
 
 ```sh
-cargo build --release
-cargo test               # 24 unit + 3 integration
+make            # list available targets
+make build      # cargo build --release
+make test       # 24 unit + 3 integration
 ```
+
+## Releasing
+
+Releases are calver-tagged (`vYYYY.M.D`) and built by
+[`.github/workflows/release.yml`](.github/workflows/release.yml).
+
+```sh
+make release                    # triggers today's date
+make release VERSION=2026.5.23  # explicit version
+```
+
+`make release` requires the [`gh`](https://cli.github.com) CLI and triggers
+the workflow, which builds darwin/linux/windows artifacts, publishes a GitHub
+release, and pushes a Homebrew formula bump in [`Formula/bx.rb`](Formula/bx.rb).
 
 ## License
 

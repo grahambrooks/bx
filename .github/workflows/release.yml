@@ -1,0 +1,187 @@
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version (no v prefix). Defaults to today's UTC date as YYYY.M.D."
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.compute.outputs.version }}
+      tag: ${{ steps.compute.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: compute
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="$(date -u +%Y.%-m.%-d)"
+          fi
+          TAG="v${VERSION}"
+          # Refuse to overwrite an existing tag.
+          if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
+            echo "::error::tag ${TAG} already exists on origin"
+            exit 1
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}"         >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            os: macos-14
+            slug: darwin-arm64
+            archive: tar.gz
+          - target: x86_64-apple-darwin
+            os: macos-13
+            slug: darwin-x64
+            archive: tar.gz
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            slug: linux-x64
+            archive: tar.gz
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-24.04-arm
+            slug: linux-arm64
+            archive: tar.gz
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            slug: windows-x64
+            archive: zip
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Package (tar.gz)
+        if: matrix.archive == 'tar.gz'
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${{ needs.prepare.outputs.version }}"
+          NAME="bx-${VERSION}-${{ matrix.slug }}"
+          mkdir -p dist
+          # Explicit chmod +x: tar preserves modes, and a missing +x here
+          # breaks downstream consumers (see fetch.rs::ensure_target_executable
+          # for the workaround we shipped when symgraph hit this).
+          chmod +x "target/${{ matrix.target }}/release/bx"
+          tar -C "target/${{ matrix.target }}/release" -czf "dist/${NAME}.tar.gz" bx
+
+      - name: Package (zip)
+        if: matrix.archive == 'zip'
+        shell: pwsh
+        run: |
+          $version = "${{ needs.prepare.outputs.version }}"
+          $name = "bx-$version-${{ matrix.slug }}"
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Compress-Archive -Path "target/${{ matrix.target }}/release/bx.exe" -DestinationPath "dist/$name.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bx-${{ matrix.slug }}
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: bx-*
+          merge-multiple: true
+
+      - name: Compute SHA256s
+        id: sums
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist
+          : > SHA256SUMS
+          for f in bx-*; do sha256sum "$f" >> SHA256SUMS; done
+          sha () { sha256sum "$1" | awk '{print $1}'; }
+          VERSION="${{ needs.prepare.outputs.version }}"
+          {
+            echo "darwin_arm64=$(sha "bx-${VERSION}-darwin-arm64.tar.gz")"
+            echo "darwin_x64=$(sha   "bx-${VERSION}-darwin-x64.tar.gz")"
+            echo "linux_arm64=$(sha  "bx-${VERSION}-linux-arm64.tar.gz")"
+            echo "linux_x64=$(sha    "bx-${VERSION}-linux-x64.tar.gz")"
+            echo "windows_x64=$(sha  "bx-${VERSION}-windows-x64.zip")"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Tag release commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git tag "${{ needs.prepare.outputs.tag }}"
+          git push origin "${{ needs.prepare.outputs.tag }}"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create "${{ needs.prepare.outputs.tag }}" \
+            --title "${{ needs.prepare.outputs.tag }}" \
+            --notes "Automated release for ${{ needs.prepare.outputs.tag }}." \
+            dist/*
+
+      - name: Update Homebrew formula
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/update_formula.py \
+            --version      "${{ needs.prepare.outputs.version }}" \
+            --darwin-arm64 "${{ steps.sums.outputs.darwin_arm64 }}" \
+            --darwin-x64   "${{ steps.sums.outputs.darwin_x64 }}" \
+            --linux-arm64  "${{ steps.sums.outputs.linux_arm64 }}" \
+            --linux-x64    "${{ steps.sums.outputs.linux_x64 }}"
+
+      - name: Commit formula update
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet Formula/bx.rb; then
+            echo "Formula already up to date — nothing to commit."
+            exit 0
+          fi
+          git add Formula/bx.rb
+          git commit -m "homebrew: bump to ${{ needs.prepare.outputs.tag }}"
+          git push origin HEAD:main

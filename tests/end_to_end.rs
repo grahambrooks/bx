@@ -276,3 +276,69 @@ fn reports_release_not_found_clearly() {
         "expected clear 'not found' message, got: {stderr}"
     );
 }
+
+/// Prove the property MCP STDIO transport relies on: a line written to bx's
+/// stdin reaches the child binary, and the child's reply lands on bx's stdout
+/// unmodified. Stdio inheritance is the *documented* behaviour of
+/// `Command::status` in `src/exec.rs`, but until this test landed nothing
+/// actually verified it end-to-end.
+#[test]
+#[cfg(unix)]
+fn stdio_passes_through_to_child() {
+    let script_body = b"#!/bin/sh\nIFS= read -r line\nprintf 'reply:%s\\n' \"$line\"\n";
+    let mut header = tar::Header::new_gnu();
+    header.set_path("stdio-echo").unwrap();
+    header.set_size(script_body.len() as u64);
+    header.set_mode(0o755);
+    header.set_cksum();
+    let encoder = GzEncoder::new(Vec::new(), Compression::default());
+    let mut tar = tar::Builder::new(encoder);
+    tar.append(&header, &script_body[..]).unwrap();
+    let tarball = tar.into_inner().unwrap().finish().unwrap();
+    let tarball_size = tarball.len() as u64;
+    let asset_name = format!("stdio-echo-v1-{}.tar.gz", host_platform_slug());
+    let asset_name = asset_name.as_str();
+
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = listener.local_addr().unwrap();
+    let base = format!("http://{addr}");
+    drop(listener);
+
+    let asset_url = format!("{base}/dl/{asset_name}");
+    let json = release_json(&asset_url, asset_name, tarball_size);
+    let routes = vec![
+        (
+            "/repos/o/stdio-echo/releases/latest".to_string(),
+            json.into_bytes(),
+            "application/json",
+        ),
+        (format!("/dl/{asset_name}"), tarball, "application/gzip"),
+    ];
+
+    let listener = TcpListener::bind(addr).unwrap();
+    let routes_arc: Routes = Arc::new(Mutex::new(routes));
+    let _server = thread::spawn(move || {
+        for stream in listener.incoming() {
+            let stream = match stream {
+                Ok(s) => s,
+                Err(_) => continue,
+            };
+            let routes = routes_arc.clone();
+            thread::spawn(move || handle_request(stream, routes));
+        }
+    });
+
+    let cache_root = tempfile::tempdir().unwrap();
+    let mut cmd = Command::cargo_bin("bx").unwrap();
+    cmd.env("BX_GITHUB_API_BASE", &base)
+        .env("XDG_CACHE_HOME", cache_root.path())
+        .arg("o/stdio-echo")
+        .write_stdin("hello-mcp\n");
+
+    let assert = cmd.assert().success();
+    let stdout = String::from_utf8_lossy(&assert.get_output().stdout);
+    assert!(
+        stdout.contains("reply:hello-mcp"),
+        "expected stdin to pass through and child's reply to surface on stdout, got: {stdout}"
+    );
+}
