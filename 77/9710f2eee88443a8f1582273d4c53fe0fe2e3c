@@ -1,0 +1,19 @@
+src/fetch.rs
+  s_7c02e3620b6ef8::t_8fecc52d624c98 32-35,39-76
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "779710f2eee88443a8f1582273d4c53fe0fe2e3c",
+  "prompts": {},
+  "sessions": {
+    "s_7c02e3620b6ef8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fc8d2210-5054-418a-9617-3f0df3691915",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Graham Brooks <graham@grahambrooks.com>"
+    }
+  }
+}
