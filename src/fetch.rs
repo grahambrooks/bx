@@ -29,7 +29,51 @@ pub async fn ensure(
     extract_or_place(&downloaded, &chosen.name, cache_dir)?;
 
     let preferred_name = spec.binary.as_deref().unwrap_or(&spec.repo);
+    // Some publishers ship tarballs whose binary entry has mode 0o644 —
+    // tar's unpack faithfully preserves that and find_binary then rejects
+    // the file. Repair the exec bit here so `bx` Just Works on those.
+    ensure_target_executable(cache_dir, preferred_name)?;
     cache::find_binary(cache_dir, preferred_name)
+}
+
+#[cfg(unix)]
+fn ensure_target_executable(dir: &Path, name: &str) -> Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    let mut stack = vec![dir.to_path_buf()];
+    while let Some(current) = stack.pop() {
+        let entries = match std::fs::read_dir(&current) {
+            Ok(rd) => rd,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(e) => return Err(e.into()),
+        };
+        for entry in entries {
+            let entry = entry?;
+            let path = entry.path();
+            let file_type = entry.file_type()?;
+            if file_type.is_dir() {
+                stack.push(path);
+                continue;
+            }
+            if !file_type.is_file() {
+                continue;
+            }
+            let file_name = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
+            if file_name == name {
+                let mut perms = std::fs::metadata(&path)?.permissions();
+                let mode = perms.mode();
+                if mode & 0o111 == 0 {
+                    perms.set_mode(mode | 0o755);
+                    std::fs::set_permissions(&path, perms)?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn ensure_target_executable(_dir: &Path, _name: &str) -> Result<()> {
+    Ok(())
 }
 
 async fn download(asset: &Asset, into: &Path) -> Result<PathBuf> {
