@@ -46,8 +46,7 @@ pub struct Tool {
 impl Manifest {
     pub fn load(path: &Path) -> Result<Self> {
         let text = std::fs::read_to_string(path)?;
-        toml::from_str(&text)
-            .map_err(|e| BxError::Manifest(format!("{}: {e}", path.display())))
+        toml::from_str(&text).map_err(|e| BxError::Manifest(format!("{}: {e}", path.display())))
     }
 
     pub fn save(&self, path: &Path) -> Result<()> {
@@ -74,7 +73,8 @@ impl Manifest {
             if existing.map(|s| s.as_str()) == Some(sha256) {
                 return false;
             }
-            tool.checksums.insert(platform.to_string(), sha256.to_string());
+            tool.checksums
+                .insert(platform.to_string(), sha256.to_string());
             return true;
         }
         let mut checksums = BTreeMap::new();
@@ -120,7 +120,10 @@ mod tests {
         assert_eq!(loaded.tools.len(), 1);
         assert_eq!(loaded.tools[0].spec, "owner/repo@v1.0");
         assert_eq!(loaded.tools[0].checksums.get("linux-x64").unwrap(), "abc");
-        assert_eq!(loaded.tools[0].checksums.get("darwin-arm64").unwrap(), "def");
+        assert_eq!(
+            loaded.tools[0].checksums.get("darwin-arm64").unwrap(),
+            "def"
+        );
     }
 
     #[test]

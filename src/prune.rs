@@ -44,7 +44,11 @@ pub fn prune_at(root: &Path, opts: PruneOpts) -> Result<()> {
         return Ok(());
     }
 
-    let verb = if opts.dry_run { "would remove" } else { "removed" };
+    let verb = if opts.dry_run {
+        "would remove"
+    } else {
+        "removed"
+    };
     let mut total: u64 = 0;
     for removal in &removals {
         let display_path = removal.path.strip_prefix(root).unwrap_or(&removal.path);
@@ -89,7 +93,11 @@ fn plan(root: &Path, opts: &PruneOpts) -> Result<Vec<Removal>> {
             // Newest first.
             tags.sort_by_key(|(_, mt)| Reverse(*mt));
 
-            let skip = if opts.all { 0 } else { opts.keep.min(tags.len()) };
+            let skip = if opts.all {
+                0
+            } else {
+                opts.keep.min(tags.len())
+            };
             for (path, _) in tags.into_iter().skip(skip) {
                 let size = dir_size(&path);
                 removals.push(Removal { path, size });

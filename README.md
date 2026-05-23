@@ -79,7 +79,7 @@ to force re-fetch + re-verify.
 | Milestone | Adds |
 |---|---|
 | **0** ✅ | Fetch + cache + exec end-to-end |
-| **1** | `.bx.toml` manifest, checksum verification, `bx prune` |
+| **1** ✅ | `.bx.toml` manifest, checksum verification, `bx prune` |
 | **2** | `bx mcp add/list/update/inspect` — writes/reads MCP client configs |
 | **3** | Skill frontmatter integration: `bx ensure --skill <dir>` |
 | **4** | Sigstore verification, trust-on-first-use, `--offline` mode |
@@ -97,15 +97,19 @@ to force re-fetch + re-verify.
 
 ```
 src/
-├── main.rs       # CLI entry, clap setup, error rendering
-├── lib.rs        # Pipeline orchestration: spec → resolve → fetch → exec
+├── main.rs       # CLI entry, clap subcommand dispatch, error rendering
+├── lib.rs        # Pipeline: spec → resolve → fetch → verify → exec
+│                 # Also hosts `ensure` + `add` operations
 ├── spec.rs       # owner/repo[@ref][#bin] parser
 ├── platform.rs   # OS/arch detection + keyword vocabularies
 ├── github.rs     # Minimal Releases API client
 ├── asset.rs      # Asset-name scoring heuristic
 ├── cache.rs      # Cache layout + binary discovery
-├── fetch.rs      # Download + tar.gz/zip extraction
+├── fetch.rs      # Download, extract, and (optional) sha256 verification
 ├── exec.rs       # Stdio-inheriting child process exec
+├── checksum.rs   # SHA-256 of the downloaded archive
+├── manifest.rs   # `.bx.toml` schema, walk-up lookup, load/save
+├── prune.rs      # `bx prune` — GC the cache
 └── error.rs      # Typed errors with rich Display
 ```
 
@@ -114,7 +118,7 @@ src/
 ```sh
 make            # list available targets
 make build      # cargo build --release
-make test       # 24 unit + 3 integration
+make test       # 39 unit + 4 integration
 ```
 
 ## Releasing
@@ -128,8 +132,10 @@ make release VERSION=2026.5.23  # explicit version
 ```
 
 `make release` requires the [`gh`](https://cli.github.com) CLI and triggers
-the workflow, which builds darwin/linux/windows artifacts, publishes a GitHub
-release, and pushes a Homebrew formula bump in [`Formula/bx.rb`](Formula/bx.rb).
+the workflow, which builds `darwin-arm64`, `linux-x64`, `linux-arm64`, and
+`windows-x64` artifacts, publishes a GitHub release, and pushes a Homebrew
+formula bump in [`Formula/bx.rb`](Formula/bx.rb). Intel Macs are not a
+supported build target.
 
 ## License
 

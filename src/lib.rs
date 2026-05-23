@@ -53,14 +53,8 @@ pub async fn run(spec: &spec::Spec, args: &[String], refresh: bool) -> Result<i3
     let cache_dir = cache::binary_dir(spec, &resolved.tag)?;
     let binary_path = if refresh || !binary_in_cache(&cache_dir, spec) {
         let expected = expected_checksum_for(spec, &platform);
-        let fetched = fetch::ensure(
-            &resolved,
-            &platform,
-            &cache_dir,
-            spec,
-            expected.as_deref(),
-        )
-        .await?;
+        let fetched =
+            fetch::ensure(&resolved, &platform, &cache_dir, spec, expected.as_deref()).await?;
         fetched.binary
     } else {
         find_binary(&cache_dir, spec)?
@@ -103,14 +97,8 @@ pub async fn ensure(manifest_path: Option<&Path>, record: bool) -> Result<()> {
             continue;
         }
 
-        let fetched = fetch::ensure(
-            &resolved,
-            &platform,
-            &cache_dir,
-            &spec,
-            expected.as_deref(),
-        )
-        .await?;
+        let fetched =
+            fetch::ensure(&resolved, &platform, &cache_dir, &spec, expected.as_deref()).await?;
 
         if record && expected.is_none() {
             if m.record_checksum(&tool_spec, &platform_slug, &fetched.archive_sha256) {
@@ -149,8 +137,7 @@ pub async fn add(spec_str: &str, path: Option<&Path>) -> Result<()> {
     let pinned_spec_str = spec.to_string();
 
     let cache_dir = cache::binary_dir(&spec, &resolved.tag)?;
-    let fetched =
-        fetch::ensure(&resolved, &platform, &cache_dir, &spec, None).await?;
+    let fetched = fetch::ensure(&resolved, &platform, &cache_dir, &spec, None).await?;
 
     let path = path
         .map(PathBuf::from)
