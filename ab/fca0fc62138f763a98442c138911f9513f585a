@@ -1,0 +1,30 @@
+tests/end_to_end.rs
+  s_7c02e3620b6ef8::t_48e6d3e7defd81 279-344
+.github/workflows/release.yml
+  s_7c02e3620b6ef8::t_9c655c23f88104 1-187
+Formula/bx.rb
+  s_7c02e3620b6ef8::t_4f04dd0daed595 1-40
+README.md
+  s_7c02e3620b6ef8::t_f0e0c9886a2b55 99-101,104-116
+  s_7c02e3620b6ef8::t_dc11060dc40ade 3-6,15-33
+.github/scripts/update_formula.py
+  s_7c02e3620b6ef8::t_54eeec0ffc223e 1-53
+Makefile
+  s_7c02e3620b6ef8::t_498c23ac9cecfe 1-37
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "abfca0fc62138f763a98442c138911f9513f585a",
+  "prompts": {},
+  "sessions": {
+    "s_7c02e3620b6ef8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fc8d2210-5054-418a-9617-3f0df3691915",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Graham Brooks <graham@grahambrooks.com>"
+    }
+  }
+}
