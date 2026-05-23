@@ -1,0 +1,21 @@
+Formula/bx.rb
+  s_7c02e3620b6ef8::t_d1044848c4001a 11-12
+.github/scripts/update_formula.py
+  s_7c02e3620b6ef8::t_b67a9d5dae1978 18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.0",
+  "base_commit_sha": "4b1a6dc845c7e914ef16014e88ba3cb2d82698d4",
+  "prompts": {},
+  "sessions": {
+    "s_7c02e3620b6ef8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fc8d2210-5054-418a-9617-3f0df3691915",
+        "model": "claude-opus-4-7"
+      },
+      "human_author": "Graham Brooks <graham@grahambrooks.com>"
+    }
+  }
+}
