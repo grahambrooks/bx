@@ -8,14 +8,12 @@ class Bx < Formula
   # Do not remove the `# sha256:<platform>` sentinel comments — the updater
   # uses them to find each line and will fail the release if any go missing.
 
+  # Apple Silicon only — Intel Macs are not a supported build target.
+  # On an Intel Mac, Homebrew will report "no download URL"; that's intentional.
   on_macos do
     on_arm do
       url "https://github.com/grahambrooks/bx/releases/download/v#{version}/bx-#{version}-darwin-arm64.tar.gz"
       sha256 "0000000000000000000000000000000000000000000000000000000000000000" # sha256:darwin_arm64
-    end
-    on_intel do
-      url "https://github.com/grahambrooks/bx/releases/download/v#{version}/bx-#{version}-darwin-x64.tar.gz"
-      sha256 "0000000000000000000000000000000000000000000000000000000000000000" # sha256:darwin_x64
     end
   end
 

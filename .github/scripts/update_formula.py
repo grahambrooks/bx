@@ -15,7 +15,7 @@ from pathlib import Path
 
 FORMULA = Path(__file__).resolve().parents[2] / "Formula" / "bx.rb"
 
-PLATFORMS = ("darwin_arm64", "darwin_x64", "linux_arm64", "linux_x64")
+PLATFORMS = ("darwin_arm64", "linux_arm64", "linux_x64")
 
 
 def main() -> int:

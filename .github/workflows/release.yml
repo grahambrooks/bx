@@ -47,10 +47,6 @@ jobs:
             os: macos-14
             slug: darwin-arm64
             archive: tar.gz
-          - target: x86_64-apple-darwin
-            os: macos-13
-            slug: darwin-x64
-            archive: tar.gz
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
             slug: linux-x64
@@ -137,7 +133,6 @@ jobs:
           VERSION="${{ needs.prepare.outputs.version }}"
           {
             echo "darwin_arm64=$(sha "bx-${VERSION}-darwin-arm64.tar.gz")"
-            echo "darwin_x64=$(sha   "bx-${VERSION}-darwin-x64.tar.gz")"
             echo "linux_arm64=$(sha  "bx-${VERSION}-linux-arm64.tar.gz")"
             echo "linux_x64=$(sha    "bx-${VERSION}-linux-x64.tar.gz")"
             echo "windows_x64=$(sha  "bx-${VERSION}-windows-x64.zip")"
@@ -170,7 +165,6 @@ jobs:
           python3 .github/scripts/update_formula.py \
             --version      "${{ needs.prepare.outputs.version }}" \
             --darwin-arm64 "${{ steps.sums.outputs.darwin_arm64 }}" \
-            --darwin-x64   "${{ steps.sums.outputs.darwin_x64 }}" \
             --linux-arm64  "${{ steps.sums.outputs.linux_arm64 }}" \
             --linux-x64    "${{ steps.sums.outputs.linux_x64 }}"
 
