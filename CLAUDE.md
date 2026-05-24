@@ -43,6 +43,17 @@ The scorer is a small heuristic, not a manifest. It rewards matches on this plat
 
 `.bx.toml` schema is `[[tool]]` array-of-tables with `spec` (exact-match string) and a `[tool.checksums]` per-platform map keyed by platform slug (`darwin-arm64`, `linux-x64`, …). `manifest::find(start)` walks ancestors looking for `.bx.toml`; `Manifest::load/save` round-trip via the `toml` crate (comments are NOT preserved — this is auto-managed, hand-edits survive only when no `bx add`/`bx ensure --record` writes the file). `record_checksum` is idempotent. `checksum::sha256_hex` hashes the *archive*, not the extracted binary, for reasons documented at the top of the file (archive is what travels the wire; extraction is non-deterministic; matches ecosystem conventions).
 
+### Sandboxing policy (planned)
+
+Sandboxing is a planned feature; design is locked but no code has shipped. **Out of the box, `bx` runs binaries with no sandbox** — this is a deliberate adoption-friction decision, not an oversight. When implementing:
+
+- The default code path (no `--sandbox` flag, no `[tool.sandbox]` in `.bx.toml`, no `BX_SANDBOX_DEFAULT` env) MUST remain unsandboxed. The `wrap_command` no-op when policy is `None` is a contract, not a placeholder.
+- Do NOT introduce a "secure by default" behavior under any flag rename or refactor. Enterprise opt-in is `BX_SANDBOX_DEFAULT=strict` via env / MDM, not a compile-time toggle.
+- macOS is the first target (via `sandbox-exec`); Linux follows (via `bubblewrap` + an in-process HTTPS proxy for host allow-listing). Windows is deferred. On unsupported platforms the no-op must log a `WARN` line but still run the binary; only `BX_SANDBOX_FALLBACK=error` should refuse.
+- Three built-in profiles: `strict` (deny-all + cache + cwd), `project` (`strict` + cwd write + `~/.config` read), `permissive` (`$HOME` read + cwd write + network allow). `strict` is the recommended profile for the "untrusted public binaries" threat model.
+
+The full schema, profile templates, and rationale live in the README's `## Sandboxing` section — keep that as the user-facing source of truth and treat this section as the contributor-facing contract.
+
 ### Errors (`error.rs`)
 
 All errors are `BxError` variants with `thiserror`. `main.rs` walks the `source()` chain and prints `caused by:` lines — keep the chain intact when adding new error variants (use `#[from]` for upstream errors so the source link is preserved). Notable M1 additions: `Manifest(String)` for parse/serialize, `ChecksumMismatch { expected, actual, asset }` (exit code 1 with a clear message).

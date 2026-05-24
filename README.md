@@ -113,6 +113,46 @@ src/
 └── error.rs      # Typed errors with rich Display
 ```
 
+## Sandboxing
+
+`bx` runs binaries with the same privileges as the calling user, with **no
+sandbox by default**. Adoption friction stays at zero: install bx, run a
+tool, it works. There is no hidden "secure by default" mode — if no policy
+is declared, no sandbox is applied.
+
+For enterprise or untrusted-source use, sandboxing is opt-in via any of:
+
+- `bx --sandbox <profile> <spec>` — ad-hoc, per invocation
+- `[tool.sandbox]` table in `.bx.toml` — per pinned tool
+- `BX_SANDBOX_DEFAULT=<profile>` env var — org-wide default (e.g. shipped via MDM)
+
+Built-in profile templates (when the feature ships):
+
+| Profile | Read | Write | Network |
+|---|---|---|---|
+| `strict` | `/usr/lib`, `/System`, the binary's cache dir, cwd | nothing | deny (unless allow-listed) |
+| `project` | `strict` + `~/.config` (read-only) | cwd subtree | deny (unless allow-listed) |
+| `permissive` | `$HOME` | cwd subtree | allow |
+
+`.bx.toml` schema preview:
+
+```toml
+[[tool]]
+spec = "owner/server@v1.0"
+
+[tool.sandbox]
+profile = "strict"
+network = ["api.github.com", "internal.corp"]   # "none" | "allow" | host list
+# read  = ["~/.config/foo"]                     # optional overrides
+# write = ["./.foo-data"]
+```
+
+**Status: planned, not yet shipped.** First slice targets macOS via
+`sandbox-exec`; Linux follows via `bubblewrap` + an in-process HTTPS proxy
+for host allow-listing; Windows is deferred. On platforms without sandbox
+support, `bx` logs a warning and runs unwrapped unless
+`BX_SANDBOX_FALLBACK=error` is set.
+
 ## Build and test
 
 ```sh
