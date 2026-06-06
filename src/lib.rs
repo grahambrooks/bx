@@ -13,6 +13,7 @@ pub mod github;
 pub mod manifest;
 pub mod platform;
 pub mod prune;
+pub mod sandbox;
 pub mod spec;
 
 pub use error::{BxError, Result};
@@ -32,9 +33,23 @@ use std::path::{Path, PathBuf};
 /// per-platform checksum is enforced on download. Cache hits skip
 /// verification — the lockfile-style contract is "verify once on install,
 /// trust on use."
-pub async fn run(spec: &spec::Spec, args: &[String], refresh: bool) -> Result<i32> {
+pub async fn run(
+    spec: &spec::Spec,
+    args: &[String],
+    refresh: bool,
+    sandbox_override: Option<&str>,
+) -> Result<i32> {
     let platform = platform::Platform::current()?;
     tracing::debug!(?platform, "detected platform");
+
+    // Resolve the sandbox policy once up front. `None` ⇒ unsandboxed, which
+    // keeps the exec path byte-for-byte identical to the no-sandbox build.
+    // This is cheap (no network) so it doesn't compromise the pinned-ref
+    // fast-path's "synchronous and cheap" invariant.
+    let policy = resolve_sandbox(spec, sandbox_override)?;
+    if let Some(p) = &policy {
+        tracing::debug!(?p, "sandbox policy active");
+    }
 
     // Fast path for pinned refs.
     if !refresh {
@@ -42,7 +57,7 @@ pub async fn run(spec: &spec::Spec, args: &[String], refresh: bool) -> Result<i3
             let cache_dir = cache::binary_dir(spec, tag)?;
             if let Ok(binary) = find_binary(&cache_dir, spec) {
                 tracing::debug!(?binary, "cache hit (pinned ref)");
-                return exec::run(&binary, args);
+                return exec::run(&binary, args, policy.as_ref());
             }
         }
     }
@@ -61,7 +76,49 @@ pub async fn run(spec: &spec::Spec, args: &[String], refresh: bool) -> Result<i3
     };
 
     tracing::debug!(?binary_path, "executing");
-    exec::run(&binary_path, args)
+    exec::run(&binary_path, args, policy.as_ref())
+}
+
+/// Resolve the sandbox policy for this invocation, or `None` to run
+/// unsandboxed. Precedence (first match wins):
+///
+/// 1. `--sandbox <profile>` on the CLI (`sandbox_override`),
+/// 2. a `[tool.sandbox]` table for this exact spec in `.bx.toml`,
+/// 3. `BX_SANDBOX_DEFAULT=<profile>` in the environment (enterprise/MDM).
+///
+/// When none apply, returns `Ok(None)` — the opt-in contract.
+fn resolve_sandbox(
+    spec: &spec::Spec,
+    sandbox_override: Option<&str>,
+) -> Result<Option<sandbox::Policy>> {
+    let config = if let Some(name) = sandbox_override {
+        Some(sandbox::Config::from_profile(name))
+    } else if let Some(cfg) = manifest_sandbox_config(spec) {
+        Some(cfg)
+    } else if let Ok(name) = std::env::var("BX_SANDBOX_DEFAULT") {
+        Some(sandbox::Config::from_profile(&name))
+    } else {
+        None
+    };
+
+    let Some(config) = config else {
+        return Ok(None);
+    };
+
+    let cwd = std::env::current_dir()?;
+    let cache_root = cache::root()?;
+    let home = directories::BaseDirs::new().map(|d| d.home_dir().to_path_buf());
+    let policy = config.into_policy(&cwd, &cache_root, home.as_deref())?;
+    Ok(Some(policy))
+}
+
+/// If the cwd ancestry contains a `.bx.toml` listing this spec exactly,
+/// return its `[tool.sandbox]` config (if any).
+fn manifest_sandbox_config(spec: &spec::Spec) -> Option<sandbox::Config> {
+    let cwd = std::env::current_dir().ok()?;
+    let path = manifest::find(&cwd)?;
+    let m = manifest::Manifest::load(&path).ok()?;
+    m.tool(&spec.to_string())?.sandbox.clone()
 }
 
 /// Run `bx ensure` against a manifest path (or walk-up from cwd if `None`).

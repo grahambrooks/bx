@@ -42,6 +42,12 @@ struct RunArgs {
     #[arg(long, global = true)]
     refresh: bool,
 
+    /// Run the binary under a sandbox profile: strict|project|permissive.
+    /// Overrides any `[tool.sandbox]` in .bx.toml and BX_SANDBOX_DEFAULT.
+    /// Omit to honor those, or to run unsandboxed if none are set.
+    #[arg(long, value_name = "PROFILE")]
+    sandbox: Option<String>,
+
     /// The spec to run: owner/repo[@ref][#binary]. Required unless a
     /// subcommand is given.
     spec: Option<String>,
@@ -149,7 +155,7 @@ async fn run_spec(args: RunArgs) -> ExitCode {
         }
     };
 
-    match bx::run(&spec, &args.args, args.refresh).await {
+    match bx::run(&spec, &args.args, args.refresh, args.sandbox.as_deref()).await {
         Ok(code) => {
             // Clamp the exit code to a u8. POSIX exit codes are 0..=255.
             let clamped = code.clamp(0, 255) as u8;

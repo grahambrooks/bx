@@ -41,6 +41,11 @@ pub struct Tool {
     pub spec: String,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub checksums: BTreeMap<String, String>,
+    /// Optional `[tool.sandbox]` table. When present, invocations matching
+    /// this `spec` run under the named profile. Absent ⇒ unsandboxed (the
+    /// opt-in contract). Hand-authored; never written by `bx add`/`ensure`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sandbox: Option<crate::sandbox::Config>,
 }
 
 impl Manifest {
@@ -82,6 +87,7 @@ impl Manifest {
         self.tools.push(Tool {
             spec: spec.to_string(),
             checksums,
+            sandbox: None,
         });
         true
     }

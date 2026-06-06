@@ -126,15 +126,20 @@ For enterprise or untrusted-source use, sandboxing is opt-in via any of:
 - `[tool.sandbox]` table in `.bx.toml` — per pinned tool
 - `BX_SANDBOX_DEFAULT=<profile>` env var — org-wide default (e.g. shipped via MDM)
 
-Built-in profile templates (when the feature ships):
+Built-in profiles:
 
 | Profile | Read | Write | Network |
 |---|---|---|---|
-| `strict` | `/usr/lib`, `/System`, the binary's cache dir, cwd | nothing | deny (unless allow-listed) |
-| `project` | `strict` + `~/.config` (read-only) | cwd subtree | deny (unless allow-listed) |
+| `strict` | system paths, the binary's cache dir, cwd | nothing | deny |
+| `project` | `strict` + `~/.config` (read-only) | cwd subtree | deny |
 | `permissive` | `$HOME` | cwd subtree | allow |
 
-`.bx.toml` schema preview:
+Network is all-or-nothing: per-host allow-listing is **not** offered because
+macOS Seatbelt cannot filter by hostname, so exposing it would be a promise
+only one platform could keep. `strict` is the recommended profile for the
+"untrusted public binary" threat model.
+
+`.bx.toml` schema:
 
 ```toml
 [[tool]]
@@ -142,16 +147,25 @@ spec = "owner/server@v1.0"
 
 [tool.sandbox]
 profile = "strict"
-network = ["api.github.com", "internal.corp"]   # "none" | "allow" | host list
-# read  = ["~/.config/foo"]                     # optional overrides
-# write = ["./.foo-data"]
+# allow_network   = true              # override the profile's network default
+# readonly_paths  = ["/opt/data"]     # additive overrides, layered on the profile
+# readwrite_paths = ["./.server-data"]
+# denied_paths    = ["./.env"]        # masked off even if a broader allow covers it
 ```
 
-**Status: planned, not yet shipped.** First slice targets macOS via
-`sandbox-exec`; Linux follows via `bubblewrap` + an in-process HTTPS proxy
-for host allow-listing; Windows is deferred. On platforms without sandbox
-support, `bx` logs a warning and runs unwrapped unless
-`BX_SANDBOX_FALLBACK=error` is set.
+**Status: macOS + Linux shipped; Windows deferred.** macOS applies an Apple
+Seatbelt profile in-process via `sandbox_init()`; Linux wraps the binary in
+[`bubblewrap`](https://github.com/containers/bubblewrap) (which must be
+installed — `bwrap` on `PATH`). On platforms without sandbox support — or when
+`bwrap` is missing — `bx` logs a warning and runs unwrapped unless
+`BX_SANDBOX_FALLBACK=error` is set. Stdio is always inherited raw, sandboxed or
+not, so MCP stdio servers behave identically.
+
+The profile/argv generators are adapted from Microsoft's
+[MXC](https://github.com/microsoft/mxc) (MIT). bx vendors only the
+security-sensitive *generation* logic; it applies the result to its own
+process so the child's stdin/stdout passthrough is never routed through a PTY
+(which would corrupt MCP's newline-framed JSON-RPC).
 
 ## Build and test
 

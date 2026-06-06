@@ -43,16 +43,18 @@ The scorer is a small heuristic, not a manifest. It rewards matches on this plat
 
 `.bx.toml` schema is `[[tool]]` array-of-tables with `spec` (exact-match string) and a `[tool.checksums]` per-platform map keyed by platform slug (`darwin-arm64`, `linux-x64`, …). `manifest::find(start)` walks ancestors looking for `.bx.toml`; `Manifest::load/save` round-trip via the `toml` crate (comments are NOT preserved — this is auto-managed, hand-edits survive only when no `bx add`/`bx ensure --record` writes the file). `record_checksum` is idempotent. `checksum::sha256_hex` hashes the *archive*, not the extracted binary, for reasons documented at the top of the file (archive is what travels the wire; extraction is non-deterministic; matches ecosystem conventions).
 
-### Sandboxing policy (planned)
+### Sandboxing policy (`sandbox/`)
 
-Sandboxing is a planned feature; design is locked but no code has shipped. **Out of the box, `bx` runs binaries with no sandbox** — this is a deliberate adoption-friction decision, not an oversight. When implementing:
+Sandboxing is **shipped for macOS + Linux** (Windows deferred). **Out of the box, `bx` runs binaries with no sandbox** — a deliberate adoption-friction decision, not an oversight. The contract:
 
-- The default code path (no `--sandbox` flag, no `[tool.sandbox]` in `.bx.toml`, no `BX_SANDBOX_DEFAULT` env) MUST remain unsandboxed. The `wrap_command` no-op when policy is `None` is a contract, not a placeholder.
-- Do NOT introduce a "secure by default" behavior under any flag rename or refactor. Enterprise opt-in is `BX_SANDBOX_DEFAULT=strict` via env / MDM, not a compile-time toggle.
-- macOS is the first target (via `sandbox-exec`); Linux follows (via `bubblewrap` + an in-process HTTPS proxy for host allow-listing). Windows is deferred. On unsupported platforms the no-op must log a `WARN` line but still run the binary; only `BX_SANDBOX_FALLBACK=error` should refuse.
-- Three built-in profiles: `strict` (deny-all + cache + cwd), `project` (`strict` + cwd write + `~/.config` read), `permissive` (`$HOME` read + cwd write + network allow). `strict` is the recommended profile for the "untrusted public binaries" threat model.
+- The default code path (no `--sandbox` flag, no `[tool.sandbox]` in `.bx.toml`, no `BX_SANDBOX_DEFAULT` env) MUST remain unsandboxed. `exec::run` takes an `Option<&sandbox::Policy>`; the `None` arm is byte-for-byte the legacy unsandboxed path — a contract, not a placeholder. `lib::resolve_sandbox` returns `None` unless a policy is explicitly opted into.
+- Do NOT introduce a "secure by default" behavior under any flag rename or refactor. Enterprise opt-in is `BX_SANDBOX_DEFAULT=strict` via env / MDM, not a compile-time toggle. Precedence: `--sandbox` > `[tool.sandbox]` > `BX_SANDBOX_DEFAULT`.
+- **Stdio passthrough is non-negotiable in every sandboxed path.** macOS applies the Seatbelt profile via `sandbox_init()` in `Command::pre_exec` on bx's *own* command (stdio untouched); Linux execs `bwrap … -- <argv>` with inherited stdio. Never adopt MXC's `ScriptRunner`, which routes the child through a PTY and captures output — it would corrupt MCP's newline-framed JSON-RPC. This is why we vendor only the *generators* (`sandbox::seatbelt::build_profile`, `sandbox::bwrap::build_args`), not MXC's exec path.
+- On platforms without a backend — or when Linux `bwrap` is not on `PATH` — `exec::fallback` logs a `WARN` and runs unsandboxed; only `BX_SANDBOX_FALLBACK=error` refuses.
+- Three built-in profiles in `sandbox::Profile`: `strict` (deny-all + cache + cwd read, no network), `project` (`strict` + cwd write + `~/.config` read), `permissive` (`$HOME` read + cwd write + network allow). `strict` is recommended for the "untrusted public binaries" threat model. Per-host network filtering is intentionally absent (Seatbelt can't enforce it) — network is all-or-nothing.
+- The generators are adapted from [MXC](https://github.com/microsoft/mxc) (MIT). When upstream changes its Seatbelt rules or bwrap flags, re-sync `seatbelt.rs`/`bwrap.rs` by hand — they are vendored, not a dependency. bx's `sandbox::Policy` is a trimmed projection of MXC's `ContainerPolicy` (only the fields the generators read); bx runs headless, so MXC's UI/clipboard/GUI knobs are hard-coded to the locked-down variant.
 
-The full schema, profile templates, and rationale live in the README's `## Sandboxing` section — keep that as the user-facing source of truth and treat this section as the contributor-facing contract.
+The user-facing schema, profile table, and rationale live in the README's `## Sandboxing` section — keep that as the user-facing source of truth and this section as the contributor-facing contract.
 
 ### Errors (`error.rs`)
 

@@ -58,4 +58,7 @@ pub enum BxError {
         actual: String,
         asset: String,
     },
+
+    #[error("sandbox error: {0}")]
+    Sandbox(String),
 }
