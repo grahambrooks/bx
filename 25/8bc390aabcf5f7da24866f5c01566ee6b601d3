@@ -1,0 +1,26 @@
+src/sandbox/seatbelt.rs
+  s_a1bbb2f13b883d::t_43708694ef7bdf 1-343
+src/sandbox/mod.rs
+  s_a1bbb2f13b883d::t_215384d1b04479 8-9
+  s_a1bbb2f13b883d::t_bdface851ffad6 196-200
+  s_a1bbb2f13b883d::t_b3cb9ef4f1ffba 1-7,10-195,201-275
+src/sandbox/bwrap.rs
+  s_a1bbb2f13b883d::t_1d59fc9d2d096b 1-21,31-81,88-107,114-139,144-164
+  s_a1bbb2f13b883d::t_bdface851ffad6 22-30,82-87,108-113,140-143
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "258bc390aabcf5f7da24866f5c01566ee6b601d3",
+  "prompts": {},
+  "sessions": {
+    "s_a1bbb2f13b883d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0ccbe1fd-0496-4340-bdd9-2b5e7ac3a95e",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Graham Brooks <graham@grahambrooks.com>"
+    }
+  }
+}
