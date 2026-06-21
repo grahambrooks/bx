@@ -239,8 +239,13 @@ mod tests {
     fn project_adds_cwd_write_and_config_read() {
         let (cwd, cache, home) = paths();
         let p = Profile::Project.into_policy(&cwd, &cache, Some(&home));
-        assert!(p.readwrite_paths.contains(&"/work/project".to_string()));
-        assert!(p.readonly_paths.contains(&"/home/u/.config".to_string()));
+        assert!(p
+            .readwrite_paths
+            .contains(&cwd.to_string_lossy().into_owned()));
+        // Build the expected path with `join` so the separator matches the
+        // platform (the code does `home.join(".config")`; Windows uses `\`).
+        let expected_config = home.join(".config").to_string_lossy().into_owned();
+        assert!(p.readonly_paths.contains(&expected_config));
         assert_eq!(p.network, Network::Block);
         assert!(!p.lpac);
     }
