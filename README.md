@@ -161,6 +161,12 @@ installed — `bwrap` on `PATH`). On platforms without sandbox support — or wh
 `BX_SANDBOX_FALLBACK=error` is set. Stdio is always inherited raw, sandboxed or
 not, so MCP stdio servers behave identically.
 
+Enforcement is covered by integration tests, not just unit tests on the
+generated profiles: under `strict`, a child's attempt to write outside the
+policy is verified to actually fail (with an unsandboxed control run proving the
+denial comes from the sandbox). The Linux case runs under `bwrap` when a usable
+user namespace is available and skips cleanly otherwise.
+
 The profile/argv generators are adapted from Microsoft's
 [MXC](https://github.com/microsoft/mxc) (MIT). bx vendors only the
 security-sensitive *generation* logic; it applies the result to its own
@@ -172,7 +178,7 @@ process so the child's stdin/stdout passthrough is never routed through a PTY
 ```sh
 make            # list available targets
 make build      # cargo build --release
-make test       # 39 unit + 4 integration
+make test       # 65 unit + 6 integration
 ```
 
 ## Releasing

@@ -11,7 +11,7 @@ use assert_cmd::Command;
 use flate2::write::GzEncoder;
 use flate2::Compression;
 use std::io::{Read, Write};
-use std::net::{TcpListener, TcpStream};
+use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
@@ -406,5 +406,142 @@ fn macos_sandbox_strict_applies_and_passes_stdio() {
     assert!(
         stdout.contains("sandboxed:ping"),
         "expected sandboxed child to run and pass stdio through, got: {stdout}"
+    );
+}
+
+/// Build a `tar.gz` containing a single executable script at `name`.
+fn script_tarball(name: &str, body: &[u8]) -> Vec<u8> {
+    let mut header = tar::Header::new_gnu();
+    header.set_path(name).unwrap();
+    header.set_size(body.len() as u64);
+    header.set_mode(0o755);
+    header.set_cksum();
+    let mut tar = tar::Builder::new(GzEncoder::new(Vec::new(), Compression::default()));
+    tar.append(&header, body).unwrap();
+    tar.into_inner().unwrap().finish().unwrap()
+}
+
+/// Reserve a loopback port and return its `(addr, base_url)`. The caller builds
+/// the route table (which must embed `base`) and then hands `addr` to [`listen`].
+/// Mirrors the bind→drop→rebind dance used inline by the other tests so the
+/// asset URL can carry the port before the server starts listening.
+fn reserve() -> (SocketAddr, String) {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = listener.local_addr().unwrap();
+    drop(listener);
+    let base = format!("http://{addr}");
+    (addr, base)
+}
+
+/// Start the fake-GitHub server on `addr` serving `routes` (detached thread).
+fn listen(addr: SocketAddr, routes: Vec<(String, Vec<u8>, &'static str)>) {
+    let listener = TcpListener::bind(addr).unwrap();
+    let routes_arc: Routes = Arc::new(Mutex::new(routes));
+    thread::spawn(move || {
+        for stream in listener.incoming().flatten() {
+            let routes = routes_arc.clone();
+            thread::spawn(move || handle_request(stream, routes));
+        }
+    });
+}
+
+/// Linux only: verify `bwrap` is not just present but actually *usable* (an
+/// unprivileged user namespace can be created). CI without user-namespace
+/// support should skip the enforcement test rather than fail it — this mirrors
+/// `exec::fallback`, which runs unsandboxed when no backend is available.
+#[cfg(target_os = "linux")]
+fn bwrap_usable() -> bool {
+    std::process::Command::new("bwrap")
+        .args(["--ro-bind", "/", "/", "--unshare-user", "true"])
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+}
+
+/// Enforcement: prove `strict` actually *denies* a write the policy never
+/// granted — not merely that the sandboxed child runs (which
+/// `*_sandbox_strict_applies_and_passes_stdio` already covers). The fake tool
+/// tries to create `probe.txt` in its cwd; under `strict` the cwd is read-only,
+/// so the write must fail. A control run of the *same* fixture without
+/// `--sandbox` must succeed, proving the denial came from the sandbox and not
+/// some unrelated error — without that control a profile that silently broke
+/// every exec would still pass.
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[test]
+fn sandbox_strict_denies_out_of_policy_write() {
+    #[cfg(target_os = "linux")]
+    if !bwrap_usable() {
+        eprintln!(
+            "skipping sandbox_strict_denies_out_of_policy_write: bwrap unusable on this host"
+        );
+        return;
+    }
+
+    let script =
+        b"#!/bin/sh\nif printf 'x' > probe.txt 2>/dev/null; then printf 'write:ALLOWED\\n'; else printf 'write:DENIED\\n'; fi\n";
+    let tarball = script_tarball("probe-tool", script);
+    let size = tarball.len() as u64;
+    let asset = format!("probe-tool-v1.0.0-{}.tar.gz", host_platform_slug());
+
+    let (addr, base) = reserve();
+    let asset_url = format!("{base}/dl/{asset}");
+    listen(
+        addr,
+        vec![
+            (
+                "/repos/o/probe-tool/releases/tags/v1.0.0".to_string(),
+                release_json(&asset_url, &asset, size).into_bytes(),
+                "application/json",
+            ),
+            (format!("/dl/{asset}"), tarball, "application/gzip"),
+        ],
+    );
+
+    // Shared cache across both runs so the second is a pure cache hit (no
+    // network). `strict` adds this cache root to the readable set, so the
+    // sandboxed child can still exec the fetched binary out of it.
+    let cache = tempfile::tempdir().unwrap();
+
+    // Sandboxed run — also performs the one-time fetch. The write must be
+    // DENIED and no file may appear in the cwd.
+    let sb_dir = tempfile::tempdir().unwrap();
+    let mut cmd = Command::cargo_bin("bx").unwrap();
+    cmd.env("BX_GITHUB_API_BASE", &base)
+        .env("XDG_CACHE_HOME", cache.path())
+        .current_dir(sb_dir.path())
+        .arg("--sandbox")
+        .arg("strict")
+        .arg("o/probe-tool@v1.0.0");
+    let assert = cmd.assert().success();
+    let out = String::from_utf8_lossy(&assert.get_output().stdout);
+    assert!(
+        out.contains("write:DENIED"),
+        "strict must deny the out-of-policy write, got: {out}"
+    );
+    assert!(
+        !sb_dir.path().join("probe.txt").exists(),
+        "probe.txt must not be created under the sandbox"
+    );
+
+    // Control run — identical fixture, no sandbox, cache hit (pointed at an
+    // unreachable host to prove no network). The write must SUCCEED.
+    let ctl_dir = tempfile::tempdir().unwrap();
+    let mut cmd = Command::cargo_bin("bx").unwrap();
+    cmd.env(
+        "BX_GITHUB_API_BASE",
+        "http://invalid-host-that-does-not-exist:1",
+    )
+    .env("XDG_CACHE_HOME", cache.path())
+    .current_dir(ctl_dir.path())
+    .arg("o/probe-tool@v1.0.0");
+    let assert = cmd.assert().success();
+    let out = String::from_utf8_lossy(&assert.get_output().stdout);
+    assert!(
+        out.contains("write:ALLOWED"),
+        "unsandboxed control must allow the write, got: {out}"
+    );
+    assert!(
+        ctl_dir.path().join("probe.txt").exists(),
+        "control run should have created probe.txt"
     );
 }
