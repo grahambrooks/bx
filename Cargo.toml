@@ -41,6 +41,23 @@ hex = "0.4"
 [target.'cfg(target_os = "macos")'.dependencies]
 libc = "0.2"
 
+# Windows sandboxing launches the binary in an AppContainer: derive the profile
+# SID, grant/revert per-path ACEs, then `CreateProcessW` with a
+# `SECURITY_CAPABILITIES` proc-thread attribute (LPAC for the strict profile).
+# See `exec.rs` (apply) and `sandbox/appcontainer.rs` (pure plan generation).
+# `windows-sys` is FFI-only (link declarations, no C build) so it compiles for
+# the target without a cross C toolchain.
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = { version = "0.59", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Security_Authorization",
+    "Win32_Security_Isolation",
+    "Win32_System_Threading",
+    "Win32_System_Console",
+    "Win32_System_SystemServices",
+] }
+
 [dev-dependencies]
 assert_cmd = "2"
 

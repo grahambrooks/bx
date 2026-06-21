@@ -1,0 +1,61 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: linux
+          - os: macos-14
+            name: macos
+          - os: windows-latest
+            name: windows
+    runs-on: ${{ matrix.os }}
+    name: test (${{ matrix.name }})
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.name }}
+
+      # bubblewrap is the Linux sandbox backend; install it so the Linux
+      # sandbox enforcement test actually exercises bwrap instead of skipping.
+      - name: Install bubblewrap (Linux)
+        if: matrix.name == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y bubblewrap
+
+      - name: Format
+        run: cargo fmt --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      # Unix builds the shell-script integration fixtures; the full suite runs.
+      - name: Test (unix)
+        if: matrix.name != 'windows'
+        run: cargo test --all-targets
+
+      # The end-to-end integration tests exec `#!/bin/sh` fixtures that Windows
+      # cannot launch, so the Windows job builds everything (compiling the
+      # AppContainer `win` backend) and runs the library unit tests — which
+      # include the `sandbox::appcontainer` plan-generation coverage.
+      - name: Build + lib tests (windows)
+        if: matrix.name == 'windows'
+        run: |
+          cargo build --all-targets
+          cargo test --lib

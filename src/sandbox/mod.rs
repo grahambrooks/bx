@@ -28,6 +28,7 @@
 //! GUI knobs are not exposed — the seatbelt profile hard-codes the locked-down
 //! (no WindowServer, no pasteboard, no HID) variant.
 
+pub mod appcontainer;
 pub mod bwrap;
 pub mod seatbelt;
 
@@ -64,6 +65,11 @@ pub struct Policy {
     /// macOS only: let the child allocate its own ptys via `posix_openpt`.
     /// On by default because many tools spawn shells/REPLs that need it.
     pub nested_pty: bool,
+    /// Windows only: launch as a Less-Privileged AppContainer (opt out of
+    /// `ALL APPLICATION PACKAGES`). Tighter, but the child can only load DLLs
+    /// that grant `ALL RESTRICTED APPLICATION PACKAGES`, so it is enabled for
+    /// the `strict` profile only. Ignored on non-Windows backends.
+    pub lpac: bool,
     /// macOS only: hand-authored Seatbelt profile that bypasses generation.
     pub profile_override: Option<String>,
     /// macOS only: extra Mach service global-names to allow `mach-lookup` for.
@@ -116,6 +122,7 @@ impl Profile {
             Profile::Strict => Policy {
                 readonly_paths: vec![cache, cwd],
                 network: Network::Block,
+                lpac: true,
                 ..base
             },
             Profile::Project => {
@@ -224,6 +231,8 @@ mod tests {
         assert!(p.readonly_paths.contains(&"/home/u/.cache/bx".to_string()));
         assert!(p.readwrite_paths.is_empty());
         assert_eq!(p.network, Network::Block);
+        // strict is the only profile that opts into LPAC (Windows backend).
+        assert!(p.lpac);
     }
 
     #[test]
@@ -233,6 +242,7 @@ mod tests {
         assert!(p.readwrite_paths.contains(&"/work/project".to_string()));
         assert!(p.readonly_paths.contains(&"/home/u/.config".to_string()));
         assert_eq!(p.network, Network::Block);
+        assert!(!p.lpac);
     }
 
     #[test]

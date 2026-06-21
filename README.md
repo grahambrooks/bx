@@ -153,32 +153,51 @@ profile = "strict"
 # denied_paths    = ["./.env"]        # masked off even if a broader allow covers it
 ```
 
-**Status: macOS + Linux shipped; Windows deferred.** macOS applies an Apple
-Seatbelt profile in-process via `sandbox_init()`; Linux wraps the binary in
-[`bubblewrap`](https://github.com/containers/bubblewrap) (which must be
-installed — `bwrap` on `PATH`). On platforms without sandbox support — or when
-`bwrap` is missing — `bx` logs a warning and runs unwrapped unless
-`BX_SANDBOX_FALLBACK=error` is set. Stdio is always inherited raw, sandboxed or
-not, so MCP stdio servers behave identically.
+**Status: macOS, Linux, and Windows shipped.** Each platform uses its native
+isolation primitive:
 
-Enforcement is covered by integration tests, not just unit tests on the
-generated profiles: under `strict`, a child's attempt to write outside the
-policy is verified to actually fail (with an unsandboxed control run proving the
-denial comes from the sandbox). The Linux case runs under `bwrap` when a usable
-user namespace is available and skips cleanly otherwise.
+- **macOS** applies an Apple Seatbelt profile in-process via `sandbox_init()`.
+- **Linux** wraps the binary in
+  [`bubblewrap`](https://github.com/containers/bubblewrap) (which must be
+  installed — `bwrap` on `PATH`).
+- **Windows** launches the binary in an
+  [AppContainer](https://learn.microsoft.com/windows/win32/secauthz/appcontainer-isolation):
+  bx derives the package SID, grants the policy's read-only/read-write paths to
+  it via inheritable ACEs (reverted when the child exits), and calls
+  `CreateProcessW` with a `SECURITY_CAPABILITIES` attribute. Network maps to the
+  `internetClient`/`privateNetworkClientServer` capabilities (omitted ⇒ blocked).
+  The `strict` profile additionally runs as a Less-Privileged AppContainer
+  (LPAC); a binary whose dependencies are not readable by `ALL RESTRICTED
+  APPLICATION PACKAGES` may need the `project`/`permissive` profile instead.
 
-The profile/argv generators are adapted from Microsoft's
-[MXC](https://github.com/microsoft/mxc) (MIT). bx vendors only the
-security-sensitive *generation* logic; it applies the result to its own
-process so the child's stdin/stdout passthrough is never routed through a PTY
-(which would corrupt MCP's newline-framed JSON-RPC).
+On a platform without sandbox support — or when Linux `bwrap` is missing — `bx`
+logs a warning and runs unwrapped unless `BX_SANDBOX_FALLBACK=error` is set.
+Windows fails closed: a sandbox you opted into that cannot be applied is an
+error, never a silent downgrade. Stdio is always inherited raw, sandboxed or
+not (Windows inherits the std handles directly — no console/PTY), so MCP stdio
+servers behave identically everywhere.
+
+Enforcement is covered by integration tests on macOS and Linux, not just unit
+tests on the generated policy: under `strict`, a child's attempt to write
+outside the policy is verified to actually fail (with an unsandboxed control run
+proving the denial comes from the sandbox). The Linux case runs under `bwrap`
+when a usable user namespace is available and skips cleanly otherwise. The
+Windows AppContainer path is compiled and unit-tested in CI on a Windows runner;
+its plan generation (`sandbox::appcontainer`) is unit-tested on every platform.
+
+The macOS/Linux profile generators and the Windows AppContainer model are
+adapted from Microsoft's [MXC](https://github.com/microsoft/mxc) (MIT). bx
+vendors only the security-sensitive *plan generation* logic; it applies the
+result to its own process so the child's stdin/stdout passthrough is never
+routed through a PTY/console (which would corrupt MCP's newline-framed
+JSON-RPC).
 
 ## Build and test
 
 ```sh
 make            # list available targets
 make build      # cargo build --release
-make test       # 65 unit + 6 integration
+make test       # 75 unit + 6 integration
 ```
 
 ## Releasing
