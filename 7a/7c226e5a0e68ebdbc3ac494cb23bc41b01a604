@@ -1,0 +1,26 @@
+tests/end_to_end.rs
+  s_ccbaf98025f0d4::t_c3f0b233b1bae9 211-212
+  s_ccbaf98025f0d4::t_0b40a982ccc3ec 300,311
+  s_ccbaf98025f0d4::t_ed9f4b08e5fba4 14
+  s_ccbaf98025f0d4::t_6762737738cd6e 110,126
+  s_ccbaf98025f0d4::t_cfda64fc00e7a6 328-330,342-349,351-352,355-356
+  s_ccbaf98025f0d4::t_a0a2def067e237 250,261
+  s_ccbaf98025f0d4::t_1bcc59f04066cb 185,197
+  s_ccbaf98025f0d4::t_69ba3bcecf2cd4 404,406-407
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "7a7c226e5a0e68ebdbc3ac494cb23bc41b01a604",
+  "prompts": {},
+  "sessions": {
+    "s_ccbaf98025f0d4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c2d4ea29-84fb-4d35-956a-fa84c4f87b12",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Graham Brooks <graham@grahambrooks.com>"
+    }
+  }
+}
