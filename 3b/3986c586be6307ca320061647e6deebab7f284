@@ -1,0 +1,44 @@
+.github/workflows/ci.yml
+  s_ccbaf98025f0d4::t_c5556cad929e28 1-61
+CLAUDE.md
+  s_ccbaf98025f0d4::t_b5a9c283d811c1 48,52-53,55-56
+src/sandbox/mod.rs
+  s_ccbaf98025f0d4::t_d058df00c67e00 125
+  s_ccbaf98025f0d4::t_2ef7fdf94d0069 31
+  s_ccbaf98025f0d4::t_8fc454b0304dfa 68-72
+  s_ccbaf98025f0d4::t_830c81b8f37bb6 234-235,245
+src/sandbox/appcontainer.rs
+  s_ccbaf98025f0d4::t_3896b97973cea0 1-244
+Cargo.toml
+  s_ccbaf98025f0d4::t_9ce39bab1500bb 44-60
+src/exec.rs
+  s_ccbaf98025f0d4::t_172ee650f16673 138-142
+  s_ccbaf98025f0d4::t_c848678490c1d1 216
+  s_ccbaf98025f0d4::t_39bd3613ed6748 180-197,199-200,202-206,209-215,217-561,563-564,568-581,583-585,589-598,600-648
+  s_ccbaf98025f0d4::t_f113c7c4f9c0af 565-567
+  s_ccbaf98025f0d4::t_e562e723853667 599
+  s_ccbaf98025f0d4::t_fa78c24dadfe4a 198
+  s_ccbaf98025f0d4::t_e47142f625b2db 121-137,143-146,157-160
+  s_ccbaf98025f0d4::t_d6ca8d3e0b99f4 201,207-208
+  s_ccbaf98025f0d4::t_24d71101b1fb09 562,586-588
+  s_ccbaf98025f0d4::t_d6fc78dbbc9aaf 582
+README.md
+  s_ccbaf98025f0d4::t_62738c02d595b8 156-193
+  s_ccbaf98025f0d4::t_046e9b5d90ebc8 200
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "3b3986c586be6307ca320061647e6deebab7f284",
+  "prompts": {},
+  "sessions": {
+    "s_ccbaf98025f0d4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c2d4ea29-84fb-4d35-956a-fa84c4f87b12",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Graham Brooks <graham@grahambrooks.com>"
+    }
+  }
+}
