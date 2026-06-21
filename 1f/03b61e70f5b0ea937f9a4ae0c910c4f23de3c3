@@ -1,0 +1,24 @@
+README.md
+  s_ccbaf98025f0d4::t_0413bcbd3abb97 181
+  s_ccbaf98025f0d4::t_cdf0947386a6dd 164-169
+tests/end_to_end.rs
+  s_ccbaf98025f0d4::t_4c5db33f8cc1be 14
+  s_ccbaf98025f0d4::t_879cc9925c2893 411-473,477-547
+  s_ccbaf98025f0d4::t_ccb1c631a8b610 474-476
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "1f03b61e70f5b0ea937f9a4ae0c910c4f23de3c3",
+  "prompts": {},
+  "sessions": {
+    "s_ccbaf98025f0d4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c2d4ea29-84fb-4d35-956a-fa84c4f87b12",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Graham Brooks <graham@grahambrooks.com>"
+    }
+  }
+}
