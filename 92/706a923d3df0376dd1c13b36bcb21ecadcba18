@@ -1,0 +1,20 @@
+src/sandbox/mod.rs
+  s_ccbaf98025f0d4::t_bb9196a72c5b48 242-244
+  s_ccbaf98025f0d4::t_238e2920b89db2 245-248
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "92706a923d3df0376dd1c13b36bcb21ecadcba18",
+  "prompts": {},
+  "sessions": {
+    "s_ccbaf98025f0d4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c2d4ea29-84fb-4d35-956a-fa84c4f87b12",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Graham Brooks <graham@grahambrooks.com>"
+    }
+  }
+}
