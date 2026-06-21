@@ -11,7 +11,7 @@ use assert_cmd::Command;
 use flate2::write::GzEncoder;
 use flate2::Compression;
 use std::io::{Read, Write};
-use std::net::{SocketAddr, TcpListener, TcpStream};
+use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
@@ -107,14 +107,7 @@ fn fetches_extracts_and_execs_a_binary() {
     let asset_name = format!("fake-tool-v1.0.0-{}.tar.gz", host_platform_slug());
     let asset_name = asset_name.as_str();
 
-    // We'll fill in the server addr after start to construct the asset URL.
-    // To break the cycle: start the server with a placeholder, then mutate the
-    // routes. Simpler: just construct routes with a known addr by binding twice.
-    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    let addr = listener.local_addr().unwrap();
-    let base = format!("http://{addr}");
-    drop(listener); // free the port
-
+    let (listener, base) = bind_loopback();
     let asset_url = format!("{base}/download/{asset_name}");
     let json = release_json(&asset_url, asset_name, tarball_size);
 
@@ -130,21 +123,7 @@ fn fetches_extracts_and_execs_a_binary() {
             "application/gzip",
         ),
     ];
-
-    // Bind the actual server on the same port we previously released.
-    // There's a small race here but for a local test it's fine.
-    let listener = TcpListener::bind(addr).unwrap();
-    let routes_arc = Arc::new(Mutex::new(routes));
-    let _server = thread::spawn(move || {
-        for stream in listener.incoming() {
-            let stream = match stream {
-                Ok(s) => s,
-                Err(_) => continue,
-            };
-            let routes = routes_arc.clone();
-            thread::spawn(move || handle_request(stream, routes));
-        }
-    });
+    serve(listener, routes);
 
     let cache_root = tempfile::tempdir().unwrap();
 
@@ -203,11 +182,7 @@ fn passes_through_nonzero_exit_codes() {
     let asset_name = format!("exit-test-v1-{}.tar.gz", host_platform_slug());
     let asset_name = asset_name.as_str();
 
-    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    let addr = listener.local_addr().unwrap();
-    let base = format!("http://{addr}");
-    drop(listener);
-
+    let (listener, base) = bind_loopback();
     let asset_url = format!("{base}/dl/{asset_name}");
     let json = release_json(&asset_url, asset_name, tarball_size);
 
@@ -219,19 +194,7 @@ fn passes_through_nonzero_exit_codes() {
         ),
         (format!("/dl/{asset_name}"), tarball, "application/gzip"),
     ];
-
-    let listener = TcpListener::bind(addr).unwrap();
-    let routes_arc = Arc::new(Mutex::new(routes));
-    let _server = thread::spawn(move || {
-        for stream in listener.incoming() {
-            let stream = match stream {
-                Ok(s) => s,
-                Err(_) => continue,
-            };
-            let routes = routes_arc.clone();
-            thread::spawn(move || handle_request(stream, routes));
-        }
-    });
+    serve(listener, routes);
 
     let cache_root = tempfile::tempdir().unwrap();
 
@@ -245,23 +208,8 @@ fn passes_through_nonzero_exit_codes() {
 
 #[test]
 fn reports_release_not_found_clearly() {
-    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    let addr = listener.local_addr().unwrap();
-    let base = format!("http://{addr}");
-    drop(listener);
-
-    let listener = TcpListener::bind(addr).unwrap();
-    let routes_arc: Routes = Arc::new(Mutex::new(vec![])); // any request -> 404
-    let _server = thread::spawn(move || {
-        for stream in listener.incoming() {
-            let stream = match stream {
-                Ok(s) => s,
-                Err(_) => continue,
-            };
-            let routes = routes_arc.clone();
-            thread::spawn(move || handle_request(stream, routes));
-        }
-    });
+    let (listener, base) = bind_loopback();
+    serve(listener, vec![]); // any request -> 404
 
     let cache_root = tempfile::tempdir().unwrap();
     let mut cmd = Command::cargo_bin("bx").unwrap();
@@ -299,11 +247,7 @@ fn stdio_passes_through_to_child() {
     let asset_name = format!("stdio-echo-v1-{}.tar.gz", host_platform_slug());
     let asset_name = asset_name.as_str();
 
-    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    let addr = listener.local_addr().unwrap();
-    let base = format!("http://{addr}");
-    drop(listener);
-
+    let (listener, base) = bind_loopback();
     let asset_url = format!("{base}/dl/{asset_name}");
     let json = release_json(&asset_url, asset_name, tarball_size);
     let routes = vec![
@@ -314,19 +258,7 @@ fn stdio_passes_through_to_child() {
         ),
         (format!("/dl/{asset_name}"), tarball, "application/gzip"),
     ];
-
-    let listener = TcpListener::bind(addr).unwrap();
-    let routes_arc: Routes = Arc::new(Mutex::new(routes));
-    let _server = thread::spawn(move || {
-        for stream in listener.incoming() {
-            let stream = match stream {
-                Ok(s) => s,
-                Err(_) => continue,
-            };
-            let routes = routes_arc.clone();
-            thread::spawn(move || handle_request(stream, routes));
-        }
-    });
+    serve(listener, routes);
 
     let cache_root = tempfile::tempdir().unwrap();
     let mut cmd = Command::cargo_bin("bx").unwrap();
@@ -365,11 +297,7 @@ fn macos_sandbox_strict_applies_and_passes_stdio() {
     let asset_name = format!("sb-echo-v1.0.0-{}.tar.gz", host_platform_slug());
     let asset_name = asset_name.as_str();
 
-    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    let addr = listener.local_addr().unwrap();
-    let base = format!("http://{addr}");
-    drop(listener);
-
+    let (listener, base) = bind_loopback();
     let asset_url = format!("{base}/dl/{asset_name}");
     let json = release_json(&asset_url, asset_name, tarball_size);
     let routes = vec![
@@ -380,19 +308,7 @@ fn macos_sandbox_strict_applies_and_passes_stdio() {
         ),
         (format!("/dl/{asset_name}"), tarball, "application/gzip"),
     ];
-
-    let listener = TcpListener::bind(addr).unwrap();
-    let routes_arc: Routes = Arc::new(Mutex::new(routes));
-    let _server = thread::spawn(move || {
-        for stream in listener.incoming() {
-            let stream = match stream {
-                Ok(s) => s,
-                Err(_) => continue,
-            };
-            let routes = routes_arc.clone();
-            thread::spawn(move || handle_request(stream, routes));
-        }
-    });
+    serve(listener, routes);
 
     let mut cmd = Command::cargo_bin("bx").unwrap();
     cmd.env("BX_GITHUB_API_BASE", &base)
@@ -409,7 +325,9 @@ fn macos_sandbox_strict_applies_and_passes_stdio() {
     );
 }
 
-/// Build a `tar.gz` containing a single executable script at `name`.
+/// Build a `tar.gz` containing a single executable script at `name`. Only used
+/// by the sandbox enforcement test, which is macOS/Linux-only.
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 fn script_tarball(name: &str, body: &[u8]) -> Vec<u8> {
     let mut header = tar::Header::new_gnu();
     header.set_path(name).unwrap();
@@ -421,21 +339,21 @@ fn script_tarball(name: &str, body: &[u8]) -> Vec<u8> {
     tar.into_inner().unwrap().finish().unwrap()
 }
 
-/// Reserve a loopback port and return its `(addr, base_url)`. The caller builds
-/// the route table (which must embed `base`) and then hands `addr` to [`listen`].
-/// Mirrors the bind→drop→rebind dance used inline by the other tests so the
-/// asset URL can carry the port before the server starts listening.
-fn reserve() -> (SocketAddr, String) {
+/// Bind a loopback server socket and return it together with its base URL.
+///
+/// Keep the returned listener alive and hand it straight to [`serve`]. We
+/// deliberately do *not* bind→drop→rebind to learn the port first: that pattern
+/// raced a parallel test for the freed port and produced flaky `AddrInUse`
+/// failures under `cargo test` (seen on the CI macOS runner). Binding once and
+/// moving the live listener into the server thread closes the window entirely.
+fn bind_loopback() -> (TcpListener, String) {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    let addr = listener.local_addr().unwrap();
-    drop(listener);
-    let base = format!("http://{addr}");
-    (addr, base)
+    let base = format!("http://{}", listener.local_addr().unwrap());
+    (listener, base)
 }
 
-/// Start the fake-GitHub server on `addr` serving `routes` (detached thread).
-fn listen(addr: SocketAddr, routes: Vec<(String, Vec<u8>, &'static str)>) {
-    let listener = TcpListener::bind(addr).unwrap();
+/// Serve `routes` from an already-bound `listener` on a detached thread.
+fn serve(listener: TcpListener, routes: Vec<(String, Vec<u8>, &'static str)>) {
     let routes_arc: Routes = Arc::new(Mutex::new(routes));
     thread::spawn(move || {
         for stream in listener.incoming().flatten() {
@@ -483,10 +401,10 @@ fn sandbox_strict_denies_out_of_policy_write() {
     let size = tarball.len() as u64;
     let asset = format!("probe-tool-v1.0.0-{}.tar.gz", host_platform_slug());
 
-    let (addr, base) = reserve();
+    let (listener, base) = bind_loopback();
     let asset_url = format!("{base}/dl/{asset}");
-    listen(
-        addr,
+    serve(
+        listener,
         vec![
             (
                 "/repos/o/probe-tool/releases/tags/v1.0.0".to_string(),
