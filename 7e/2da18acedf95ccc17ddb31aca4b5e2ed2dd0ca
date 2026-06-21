@@ -1,0 +1,19 @@
+src/exec.rs
+  s_ccbaf98025f0d4::t_2845a9c7279c72 216
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "7e2da18acedf95ccc17ddb31aca4b5e2ed2dd0ca",
+  "prompts": {},
+  "sessions": {
+    "s_ccbaf98025f0d4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c2d4ea29-84fb-4d35-956a-fa84c4f87b12",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Graham Brooks <graham@grahambrooks.com>"
+    }
+  }
+}
