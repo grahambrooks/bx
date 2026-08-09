@@ -1,0 +1,22 @@
+tests/end_to_end.rs
+  s_fe2669a73bae2d::t_8c0a5c827bd280 689-701,709-711
+  s_fe2669a73bae2d::t_1b48b7a7741944 636-654,657
+CLAUDE.md
+  s_fe2669a73bae2d::t_16130dbd7a2ffa 59-64
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "d0620382a7798898b2f1ffca331a7ceae5555a01",
+  "prompts": {},
+  "sessions": {
+    "s_fe2669a73bae2d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c520bc5f-0fc8-45ed-b6f3-9804940a13a3",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Graham Brooks <graham@grahambrooks.com>"
+    }
+  }
+}
