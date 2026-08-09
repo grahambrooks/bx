@@ -1,0 +1,73 @@
+src/lib.rs
+  s_fe2669a73bae2d::t_dc32fe1d4a981d 18-20
+tests/support/fixture_tool.rs
+  s_fe2669a73bae2d::t_244b4c7d6081ad 1-74
+Cargo.toml
+  s_fe2669a73bae2d::t_04c4113a614848 12-31,34-35
+  s_fe2669a73bae2d::t_ba42d2dfb286ff 32-33
+src/cache.rs
+  s_fe2669a73bae2d::t_0eeae7e0022542 156-168
+  s_fe2669a73bae2d::t_766f5efef39ef2 21-29,38-41
+  s_fe2669a73bae2d::t_cd375777c8a8cd 31-37
+src/github.rs
+  s_fe2669a73bae2d::t_eff98238ba2b70 86
+  s_fe2669a73bae2d::t_f255b6b6a8523c 87
+src/fetch.rs
+  s_fe2669a73bae2d::t_eff98238ba2b70 108
+  s_fe2669a73bae2d::t_ce2cb1dd0251b5 109
+README.md
+  s_fe2669a73bae2d::t_937e45f5b35196 56-58
+  s_fe2669a73bae2d::t_26c5b7c681d647 109
+  s_fe2669a73bae2d::t_b315529aa65f06 96-97
+CLAUDE.md
+  s_fe2669a73bae2d::t_477c460143ef01 83-84
+  s_fe2669a73bae2d::t_ad38e815098123 70-75
+  s_fe2669a73bae2d::t_81819d7d2ef4eb 34-37
+tests/end_to_end.rs
+  s_fe2669a73bae2d::t_f7acfc986c95b2 434,437
+  s_fe2669a73bae2d::t_a00ab66bfbf222 310
+  s_fe2669a73bae2d::t_69f0c23e01c8a3 395-397
+  s_fe2669a73bae2d::t_dc1503cdd69e69 4-16,25-26,29-92,95-96,100,102-121
+  s_fe2669a73bae2d::t_fb6537f5edd9f4 611,633,673
+  s_fe2669a73bae2d::t_d1c5f4d8bda4c4 539-543,547
+  s_fe2669a73bae2d::t_172778dd430f69 125-133
+  s_fe2669a73bae2d::t_5b99745fb6e86c 567-569
+  s_fe2669a73bae2d::t_bfd5c55ee34a8a 502-510,512-513,517-528
+  s_fe2669a73bae2d::t_a8697a40dbd6b3 366-369,372
+  s_fe2669a73bae2d::t_3d9bee86ddcf62 441-443
+  s_fe2669a73bae2d::t_9ef7e34ba26c8a 416
+  s_fe2669a73bae2d::t_5e6ee6b1af9aea 228,249,294,333,350,393,563,589,644,694
+  s_fe2669a73bae2d::t_11572da5eea5c6 334-337
+  s_fe2669a73bae2d::t_bcdc639cdc555d 591-593
+  s_fe2669a73bae2d::t_0d303fd9458f77 142
+  s_fe2669a73bae2d::t_184dfe4f695da3 551
+  s_fe2669a73bae2d::t_8d4b8b3af1393e 308,605-610,612-632,634-643,645-672,674-693,695-718
+  s_fe2669a73bae2d::t_692464391835d9 263-268,270-274,276-293,295-307
+  s_fe2669a73bae2d::t_edd6f2bf621164 467-489
+  s_fe2669a73bae2d::t_e35b865e2e1f83 309
+tests/tls_smoke.rs
+  s_fe2669a73bae2d::t_27cf816fd60fac 60
+  s_fe2669a73bae2d::t_5e6ee6b1af9aea 44,82
+  s_fe2669a73bae2d::t_82f24d2673dd99 1-43,45-59,61-81,83-93
+.github/workflows/ci.yml
+  s_fe2669a73bae2d::t_705fd5a9726327 48-55,58-70
+src/tls.rs
+  s_fe2669a73bae2d::t_df9e876427df89 1-8,15-45
+  s_fe2669a73bae2d::t_fd5658fcd385c9 9-14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "f85d8d84d220094fe73ab54ee3a9ed7e407b5a76",
+  "prompts": {},
+  "sessions": {
+    "s_fe2669a73bae2d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c520bc5f-0fc8-45ed-b6f3-9804940a13a3",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Graham Brooks <graham@grahambrooks.com>"
+    }
+  }
+}
