@@ -31,6 +31,10 @@ BX_LOG=debug cargo run -- grahambrooks/symgraph -- --help
 - **Exit codes pass through.** The child's exit code is clamped to `u8` and returned. Signal-killed children become `130` (SIGINT convention). Integration tests assert this — see `passes_through_nonzero_exit_codes`.
 - **Checksum verification fires on fetch, not on cache hit.** `fetch::ensure` accepts an `Option<&str>` expected sha and returns `Fetched { binary, archive_sha256 }`. `lib::run` walks up for a `.bx.toml`, looks up the spec, and passes the per-platform checksum (if any) into the fetch. Cache hits trust the prior install — the lockfile-style "verify once on install" contract. `bx --refresh` is the escape hatch when you want to re-verify; future M4 work (sigstore + binary-hash sidecars) will close the gap if it becomes load-bearing.
 
+### TLS (`tls.rs`)
+
+reqwest is built with `rustls-no-provider`, not `rustls`. The `rustls` feature hard-wires `aws-lc-rs`, which needs NASM on `x86_64-pc-windows-msvc`; `ring` does not, and bx only makes plain HTTPS GETs. So the crate depends on `rustls` directly with the `ring` feature and installs it as the process-default `CryptoProvider` via `tls::install_crypto_provider()`, called at the top of each client-construction site (`github::build_client`, `fetch::download`). **Both halves are load-bearing** — drop the direct `rustls` dependency and reqwest has no provider, so every `ClientBuilder::build` fails at runtime. It is deliberately not called from `main` so the pinned-ref cache-hit fast path stays free of setup it never uses. Root certificates come from `rustls-platform-verifier`, which reqwest 0.13 pulls in unconditionally (OS trust store on macOS/Windows, `rustls-native-certs` elsewhere) — this replaced 0.12's `rustls-tls-native-roots` feature. Note that no test exercises TLS: the integration harness serves plain HTTP over a local `TcpListener`, so a provider regression is only visible against a real host.
+
 ### Asset selection (`asset.rs`)
 
 The scorer is a small heuristic, not a manifest. It rewards matches on this platform's OS/arch keyword vocabularies (defined in `platform.rs`), strongly penalises matches on *other* platforms' keywords (so `darwin-x64` doesn't tie with `linux-x64` on a linux box), rewards the preferred archive extension (zip on Windows, tar.gz elsewhere), and tie-breaks by file size (larger wins — usually the fully-bundled artifact). Noise filters drop checksums, signatures, source tarballs, and `.mcpb` bundles before scoring. When asset selection misbehaves for a new release format, prefer extending the keyword vocabularies in `platform.rs` over adding special cases in `asset.rs`.
@@ -63,7 +67,12 @@ All errors are `BxError` variants with `thiserror`. `main.rs` walks the `source(
 
 ## Testing patterns
 
-`tests/end_to_end.rs` spins up an in-process HTTP server (an inline `TcpListener` thread + a `Routes` type alias for the route table), points `bx` at it via `BX_GITHUB_API_BASE`, and serves a synthetic tar.gz containing a shell script as the "binary". Both `assert_cmd` and a `tempfile` cache root are used so tests don't touch the real cache. When adding integration coverage, extend this file rather than introducing a new test harness — the inline-server + tempdir + env-overrides pattern is the convention. Tests that build a fixture asset must use `host_platform_slug()` (not a hardcoded slug like `linux-x64`) so the asset scorer accepts them on whichever runner is executing the tests.
+`tests/end_to_end.rs` spins up an in-process HTTP server (an inline `TcpListener` thread + a `Routes` type alias for the route table), points `bx` at it via `BX_GITHUB_API_BASE`, and serves a synthetic archive as the "binary". When adding integration coverage, extend this file rather than introducing a new test harness — the inline-server + tempdir + env-overrides pattern is the convention. Tests that build a fixture asset must use `host_platform_slug()` (not a hardcoded slug like `linux-x64`) so the asset scorer accepts them on whichever runner is executing the tests.
+
+- **Isolate the cache with `BX_CACHE_DIR`, never `XDG_CACHE_HOME`.** The latter only works on Linux — `ProjectDirs::cache_dir` ignores it on macOS and Windows — so tests that used it were reading and writing the developer's real cache. That is not merely untidy: a pinned-ref test hits the cache fast path and passes *without any network at all*, so it kept passing with the HTTP client comprehensively broken. Every `Command::cargo_bin("bx")` in a test needs a `BX_CACHE_DIR` tempdir.
+- **The fixture "binary" is a compiled executable**, `tests/support/fixture_tool.rs`, built on demand by `fixture_tool()`. It replaced embedded `#!/bin/sh` scripts, which were the only thing keeping the suite off Windows. Give it behaviour by adding a flag there rather than reaching for a shell script. Archive it with `make_tarball` or `make_zip` — both formats are covered on all platforms because `extract_or_place` dispatches on the asset extension, not the host OS.
+- **Assert the sandbox was actually applied** in any test about sandbox side effects. A build where sandboxing silently no-op'd would otherwise pass a "cleanup happened" check trivially — see `windows_sandbox_reverts_dacls_on_exit`, which asserts the denial *and* the DACL revert in one test for exactly that reason.
+- **`tests/tls_smoke.rs` is the only test that performs a TLS handshake** and is `#[ignore]`d so `cargo test` stays offline; CI runs it with `-- --ignored`. Everything else talks plain HTTP to a local listener.
 
 ## Environment variables that matter for development
 
@@ -71,7 +80,8 @@ All errors are `BxError` variants with `thiserror`. `main.rs` walks the `source(
 |---|---|
 | `BX_GITHUB_API_BASE` | Redirect API calls (used by integration tests and for GHES) |
 | `BX_LOG` | `tracing-subscriber` `EnvFilter` string, e.g. `debug` or `bx::fetch=trace` |
-| `XDG_CACHE_HOME` | Cache root override (integration tests use this to isolate) |
+| `BX_CACHE_DIR` | Cache root override, all platforms. What integration tests use to isolate |
+| `XDG_CACHE_HOME` | Linux-only cache relocation, via `directories`. Does nothing on macOS/Windows — not a test seam |
 | `GITHUB_TOKEN` | Auth for higher rate limits / private repos |
 
 ## Roadmap context

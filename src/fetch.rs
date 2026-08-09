@@ -105,6 +105,8 @@ fn ensure_target_executable(_dir: &Path, _name: &str) -> Result<()> {
 }
 
 async fn download(asset: &Asset, into: &Path) -> Result<PathBuf> {
+    crate::tls::install_crypto_provider();
+
     let client = reqwest::Client::builder()
         .user_agent(USER_AGENT)
         .build()

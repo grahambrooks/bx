@@ -83,6 +83,8 @@ pub async fn resolve(spec: &Spec) -> Result<Resolved> {
 }
 
 fn build_client() -> Result<reqwest::Client> {
+    crate::tls::install_crypto_provider();
+
     let mut headers = reqwest::header::HeaderMap::new();
     headers.insert(
         reqwest::header::ACCEPT,

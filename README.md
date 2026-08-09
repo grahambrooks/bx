@@ -53,7 +53,9 @@ Milestone 0 ships the foundation:
 - Asset selection via a scoring heuristic (handles `darwin-arm64`,
   `x86_64-unknown-linux-gnu`, etc.)
 - Tarball and zip extraction
-- Per-platform cache at `$XDG_CACHE_HOME/bx/<owner>/<repo>/<tag>/`
+- Per-platform cache (`~/.cache/bx` on Linux, `~/Library/Caches/dev.bx.bx` on
+  macOS, `%LOCALAPPDATA%\bx\cache` on Windows), laid out as
+  `<owner>/<repo>/<tag>/`
 - Fast-path: pinned refs hit cache before the network
 - Exit-code and stdio passthrough (important for MCP stdio transport)
 - Clean error chain reporting
@@ -91,7 +93,8 @@ to force re-fetch + re-verify.
 | `GITHUB_TOKEN` | Authenticated API requests (higher rate limits, private repos) |
 | `BX_GITHUB_API_BASE` | Override the GitHub API base URL (testing, GHES) |
 | `BX_LOG` | Tracing filter, e.g. `BX_LOG=debug` or `BX_LOG=bx::fetch=trace` |
-| `XDG_CACHE_HOME` | Cache root override on Linux (standard XDG behaviour) |
+| `BX_CACHE_DIR` | Cache root override, all platforms |
+| `XDG_CACHE_HOME` | Cache root override on Linux only (standard XDG behaviour) |
 
 ## Architecture
 
@@ -103,6 +106,7 @@ src/
 ├── spec.rs       # owner/repo[@ref][#bin] parser
 ├── platform.rs   # OS/arch detection + keyword vocabularies
 ├── github.rs     # Minimal Releases API client
+├── tls.rs        # Installs the rustls `ring` provider for the HTTP clients
 ├── asset.rs      # Asset-name scoring heuristic
 ├── cache.rs      # Cache layout + binary discovery
 ├── fetch.rs      # Download, extract, and (optional) sha256 verification
