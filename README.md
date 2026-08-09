@@ -4,7 +4,7 @@
 [![latest release](https://img.shields.io/github/v/release/grahambrooks/bx?sort=semver)](https://github.com/grahambrooks/bx/releases/latest)
 [![platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey)](#install)
 [![rust](https://img.shields.io/badge/rust-1.97.1%2B-orange)](https://www.rust-lang.org)
-[![license](https://img.shields.io/badge/license-MIT-blue)](#license)
+[![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
 `bx` is a missing primitive for running local binary STDIO MCP servers —
 similar to `npx`/`uvx`/`pipx`, but without dragging in a Node or Python
@@ -228,4 +228,10 @@ supported build target.
 
 ## License
 
-MIT.
+MIT — see [LICENSE](LICENSE).
+
+The sandbox plan generators are adapted from
+[MXC](https://github.com/microsoft/mxc) (MIT). Because they are vendored by
+hand rather than pulled in as a dependency, their notice is carried in
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) instead of appearing in
+`Cargo.toml`.
