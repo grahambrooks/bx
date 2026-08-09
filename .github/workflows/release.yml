@@ -108,6 +108,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      # The formula bump goes in via a pull request — see the step below.
+      pull-requests: write
     steps:
       - uses: actions/checkout@v7
         with:
@@ -168,7 +170,21 @@ jobs:
             --linux-arm64  "${{ steps.sums.outputs.linux_arm64 }}" \
             --linux-x64    "${{ steps.sums.outputs.linux_x64 }}"
 
-      - name: Commit formula update
+      # The `automation-guard` ruleset requires changes to the default branch
+      # to go through a pull request, so pushing the bump straight to main is
+      # rejected with GH013. Open a PR and merge it rather than granting the
+      # workflow a bypass: unreviewed automated writes to main are precisely
+      # what that rule is for, and a bypass would exempt every workflow, not
+      # just this step.
+      #
+      # This can merge its own PR because the ruleset requires 0 approvals and
+      # declares no required status checks. If a required-checks rule is ever
+      # added this will hang: PRs opened with GITHUB_TOKEN deliberately do not
+      # trigger workflows, so those checks would never start. Switch to a PAT
+      # or GitHub App token at that point.
+      - name: Open and merge formula bump PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
@@ -176,6 +192,14 @@ jobs:
             echo "Formula already up to date — nothing to commit."
             exit 0
           fi
+          BRANCH="homebrew/${{ needs.prepare.outputs.tag }}"
+          git switch -c "$BRANCH"
           git add Formula/bx.rb
           git commit -m "homebrew: bump to ${{ needs.prepare.outputs.tag }}"
-          git push origin HEAD:main
+          git push origin "$BRANCH"
+          gh pr create \
+            --base main \
+            --head "$BRANCH" \
+            --title "homebrew: bump to ${{ needs.prepare.outputs.tag }}" \
+            --body "Automated Homebrew formula bump for ${{ needs.prepare.outputs.tag }}."
+          gh pr merge "$BRANCH" --squash --delete-branch
