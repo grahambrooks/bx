@@ -375,20 +375,23 @@ mod win {
     /// its own ACEs did, it silently widens access, and it outlives the run.
     /// Passing the flag explicitly on both the grant and the revert pins the
     /// disposition to whatever it was before bx touched the path.
-    fn dacl_protection_flag(sd: *mut c_void) -> u32 {
+    /// Fails closed. An earlier version returned 0 here when the control bits
+    /// could not be read, which silently reproduced the buggy behaviour and
+    /// made a broken fix indistinguishable from a wrong diagnosis in CI. If we
+    /// cannot read the disposition we cannot promise to restore it, and per
+    /// the Windows contract that is an error rather than a quiet downgrade.
+    fn dacl_protection_flag(path: &str, sd: *mut c_void) -> Result<u32> {
         let mut control: u16 = 0;
         let mut revision: u32 = 0;
         let ok = unsafe { GetSecurityDescriptorControl(sd, &mut control, &mut revision) };
         if ok == 0 {
-            // Unreadable control bits: say nothing rather than assert the
-            // wrong disposition, leaving the legacy behaviour for this path.
-            return 0;
+            return Err(last_error(&format!("GetSecurityDescriptorControl({path})")));
         }
-        if control & SE_DACL_PROTECTED != 0 {
+        Ok(if control & SE_DACL_PROTECTED != 0 {
             PROTECTED_DACL_SECURITY_INFORMATION
         } else {
             UNPROTECTED_DACL_SECURITY_INFORMATION
-        }
+        })
     }
 
     /// Reverts the DACL of one path to the descriptor captured before the grant
@@ -453,7 +456,17 @@ mod win {
 
         // Capture the inheritance disposition before mutating anything; both
         // the grant below and the revert in `Drop` have to reassert it.
-        let security_info = DACL_SECURITY_INFORMATION | dacl_protection_flag(sd);
+        let security_info = match dacl_protection_flag(path, sd) {
+            Ok(flag) => DACL_SECURITY_INFORMATION | flag,
+            Err(e) => {
+                unsafe {
+                    if !sd.is_null() {
+                        LocalFree(sd as _);
+                    }
+                }
+                return Err(e);
+            }
+        };
 
         let mut trustee: TRUSTEE_W = unsafe { std::mem::zeroed() };
         unsafe { BuildTrusteeWithSidW(&mut trustee, sid) };
