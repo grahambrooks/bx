@@ -39,6 +39,15 @@ jobs:
         if: matrix.name == 'linux'
         run: sudo apt-get update && sudo apt-get install -y bubblewrap
 
+      # bwrap needs an unprivileged user namespace, which Ubuntu blocks by
+      # default via an AppArmor restriction. Without this the sandbox
+      # enforcement test cannot run — and before the CI guard in
+      # `require_bwrap_or_skip` it would have skipped silently, leaving the
+      # job green with no sandbox coverage at all.
+      - name: Allow unprivileged user namespaces (Linux)
+        if: matrix.name == 'linux'
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
       - name: Format
         run: cargo fmt --check
 

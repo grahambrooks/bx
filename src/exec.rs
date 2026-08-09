@@ -204,8 +204,8 @@ mod win {
         CreateAppContainerProfile, DeriveAppContainerSidFromAppContainerName,
     };
     use windows_sys::Win32::Security::{
-        AllocateAndInitializeSid, FreeSid, ACL, PSID, SECURITY_CAPABILITIES, SID_AND_ATTRIBUTES,
-        SID_IDENTIFIER_AUTHORITY,
+        AllocateAndInitializeSid, FreeSid, GetSecurityDescriptorControl, ACL, PSID,
+        SECURITY_CAPABILITIES, SID_AND_ATTRIBUTES, SID_IDENTIFIER_AUTHORITY,
     };
     use windows_sys::Win32::System::Console::{
         GetStdHandle, STD_ERROR_HANDLE, STD_INPUT_HANDLE, STD_OUTPUT_HANDLE,
@@ -226,6 +226,12 @@ mod win {
     /// `SE_FILE_OBJECT` for the Get/SetNamedSecurityInfo object type.
     const SE_FILE_OBJECT: i32 = 1;
     const DACL_SECURITY_INFORMATION: u32 = 0x0000_0004;
+    /// `PROTECTED_DACL_SECURITY_INFORMATION` — keep the DACL from inheriting.
+    const PROTECTED_DACL_SECURITY_INFORMATION: u32 = 0x8000_0000;
+    /// `UNPROTECTED_DACL_SECURITY_INFORMATION` — let the DACL inherit.
+    const UNPROTECTED_DACL_SECURITY_INFORMATION: u32 = 0x2000_0000;
+    /// `SE_DACL_PROTECTED` bit of `SECURITY_DESCRIPTOR_CONTROL`.
+    const SE_DACL_PROTECTED: u16 = 0x1000;
     /// Identifier authority 15 (`SECURITY_APP_PACKAGE_AUTHORITY`).
     const APP_PACKAGE_AUTHORITY: [u8; 6] = [0, 0, 0, 0, 0, 15];
     /// First sub-authority of a capability SID (`S-1-15-3-*`).
@@ -358,6 +364,33 @@ mod win {
         Ok(sid)
     }
 
+    /// Which `*_DACL_SECURITY_INFORMATION` protection flag reproduces `sd`'s
+    /// current inheritance disposition.
+    ///
+    /// `SetNamedSecurityInfoW` given only `DACL_SECURITY_INFORMATION` does not
+    /// carry the `SE_DACL_PROTECTED` bit across, so a protected DACL comes back
+    /// unprotected: its explicit ACEs are dropped in favour of ones inherited
+    /// from the parent. Effective rights often look identical, which is why
+    /// this went unnoticed — but on a directory whose parent grants more than
+    /// its own ACEs did, it silently widens access, and it outlives the run.
+    /// Passing the flag explicitly on both the grant and the revert pins the
+    /// disposition to whatever it was before bx touched the path.
+    fn dacl_protection_flag(sd: *mut c_void) -> u32 {
+        let mut control: u16 = 0;
+        let mut revision: u32 = 0;
+        let ok = unsafe { GetSecurityDescriptorControl(sd, &mut control, &mut revision) };
+        if ok == 0 {
+            // Unreadable control bits: say nothing rather than assert the
+            // wrong disposition, leaving the legacy behaviour for this path.
+            return 0;
+        }
+        if control & SE_DACL_PROTECTED != 0 {
+            PROTECTED_DACL_SECURITY_INFORMATION
+        } else {
+            UNPROTECTED_DACL_SECURITY_INFORMATION
+        }
+    }
+
     /// Reverts the DACL of one path to the descriptor captured before the grant
     /// was applied. Restoring runs on `Drop` so a panic or early return still
     /// undoes the host-state mutation.
@@ -366,6 +399,8 @@ mod win {
         original_dacl: *mut ACL,
         security_descriptor: *mut c_void,
         new_dacl: *mut ACL,
+        /// `DACL_SECURITY_INFORMATION` plus the captured protection flag.
+        security_info: u32,
     }
 
     impl Drop for GrantGuard {
@@ -374,7 +409,7 @@ mod win {
                 SetNamedSecurityInfoW(
                     self.path.as_mut_ptr(),
                     SE_FILE_OBJECT,
-                    DACL_SECURITY_INFORMATION,
+                    self.security_info,
                     std::ptr::null_mut(),
                     std::ptr::null_mut(),
                     self.original_dacl,
@@ -416,6 +451,10 @@ mod win {
             )));
         }
 
+        // Capture the inheritance disposition before mutating anything; both
+        // the grant below and the revert in `Drop` have to reassert it.
+        let security_info = DACL_SECURITY_INFORMATION | dacl_protection_flag(sd);
+
         let mut trustee: TRUSTEE_W = unsafe { std::mem::zeroed() };
         unsafe { BuildTrusteeWithSidW(&mut trustee, sid) };
         trustee.TrusteeForm = TRUSTEE_IS_SID;
@@ -449,7 +488,7 @@ mod win {
             SetNamedSecurityInfoW(
                 wpath.as_mut_ptr(),
                 SE_FILE_OBJECT,
-                DACL_SECURITY_INFORMATION,
+                security_info,
                 std::ptr::null_mut(),
                 std::ptr::null_mut(),
                 new_dacl,
@@ -475,6 +514,7 @@ mod win {
             original_dacl: old_dacl,
             security_descriptor: sd,
             new_dacl,
+            security_info,
         })
     }
 

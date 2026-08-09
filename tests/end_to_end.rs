@@ -510,21 +510,31 @@ fn serve(listener: TcpListener, routes: Vec<(String, Vec<u8>, &'static str)>) {
 /// — the failure mode is invisible exactly when it matters.
 #[cfg(target_os = "linux")]
 fn require_bwrap_or_skip(test: &str) -> bool {
-    let usable = std::process::Command::new("bwrap")
+    let probe = std::process::Command::new("bwrap")
         .args(["--ro-bind", "/", "/", "--unshare-user", "true"])
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false);
+        .output();
 
-    if usable {
-        return true;
-    }
+    let why = match &probe {
+        Ok(o) if o.status.success() => return true,
+        // Carry bwrap's own diagnosis into the failure. The usual cause is a
+        // host that forbids unprivileged user namespaces — Ubuntu restricts
+        // them by default via `kernel.apparmor_restrict_unprivileged_userns`,
+        // which ci.yml relaxes for the Linux job.
+        Ok(o) => format!(
+            "bwrap exited {}: {}",
+            o.status,
+            String::from_utf8_lossy(&o.stderr).trim()
+        ),
+        Err(e) => format!("could not run bwrap: {e}"),
+    };
+
     assert!(
         std::env::var_os("CI").is_none(),
         "{test}: bwrap is unusable but CI is set — ci.yml installs bubblewrap \
-         so this test covers the real backend. Refusing to skip silently."
+         and relaxes the userns restriction so this test covers the real \
+         backend. Refusing to skip silently. {why}"
     );
-    eprintln!("skipping {test}: bwrap unusable on this host");
+    eprintln!("skipping {test}: {why}");
     false
 }
 
