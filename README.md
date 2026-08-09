@@ -1,5 +1,11 @@
 # bx (Binary Execute)
 
+[![ci](https://github.com/grahambrooks/bx/actions/workflows/ci.yml/badge.svg)](https://github.com/grahambrooks/bx/actions/workflows/ci.yml)
+[![latest release](https://img.shields.io/github/v/release/grahambrooks/bx?sort=semver)](https://github.com/grahambrooks/bx/releases/latest)
+[![platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey)](#install)
+[![rust](https://img.shields.io/badge/rust-1.97.1%2B-orange)](https://www.rust-lang.org)
+[![license](https://img.shields.io/badge/license-MIT-blue)](#license)
+
 `bx` is a missing primitive for running local binary STDIO MCP servers —
 similar to `npx`/`uvx`/`pipx`, but without dragging in a Node or Python
 runtime. It fetches the right binary for your platform from a GitHub release,
