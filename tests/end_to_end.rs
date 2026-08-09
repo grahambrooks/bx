@@ -633,9 +633,28 @@ fn icacls(path: &Path) -> String {
     String::from_utf8_lossy(&out.stdout).to_string()
 }
 
+/// Strip the inheritance marker from an `icacls` dump.
+///
+/// Windows re-runs automatic inheritance whenever a DACL is written to an
+/// unprotected object, re-flagging parent-derived ACEs as inherited. A
+/// directory created by `CreateDirectory` under a parent with inheritable
+/// ACEs starts out holding *unflagged copies* of them, so the first DACL write
+/// normalises `X:(OI)(CI)(F)` into `X:(I)(OI)(CI)(F)`. Nothing bx does can
+/// avoid that, and it grants nobody anything the parent was not already
+/// handing out, so the marker is not part of the contract.
+///
+/// Everything else is: the principals, their rights, and the absence of any
+/// ACE bx added. Note this still catches the dangerous variant — a *protected*
+/// DACL losing its protection pulls in principals from the parent that were
+/// not there before, which changes the entry set and fails the comparison.
+#[cfg(windows)]
+fn without_inheritance_marker(dump: &str) -> String {
+    dump.replace(":(I)", ":")
+}
+
 /// Windows only: the AppContainer backend is the only one that mutates host
 /// state — it adds ACEs for the package SID to every policy path and relies on
-/// `GrantGuard`'s `Drop` to put them back. Nothing verified that revert, so a
+/// `GrantGuard`'s `Drop` to remove them. Nothing verified that revert, so a
 /// leak would accumulate silently on real users' directories.
 ///
 /// Asserting the denial in the same test matters: without it a build where
@@ -667,11 +686,19 @@ fn windows_sandbox_reverts_dacls_on_exit() {
 
     let after = icacls(sb_dir.path());
 
-    // The failure mode this has actually exhibited is subtle — the same
-    // principals with the same rights, flipped between explicit and inherited
-    // — and telling those apart needs the parent's ACL too. Whether %TEMP%
-    // carries inheritable ACEs is the fact that decides which mechanism is at
-    // work, so put it in the message rather than guessing at it again.
+    // The grant itself is gone. This is the security-critical half and the
+    // part that directly exercises GrantGuard's REVOKE_ACCESS: an AppContainer
+    // package SID renders as `S-1-15-2-…` or under APPLICATION PACKAGE
+    // AUTHORITY, and neither may survive the run.
+    for leaked in ["S-1-15-2-", "APPLICATION PACKAGE"] {
+        assert!(
+            !after.contains(leaked),
+            "GrantGuard left an AppContainer ACE behind ({leaked}):\n{after}"
+        );
+    }
+
+    // Nobody gained or lost access. Include the parent's ACL on failure: it is
+    // what distinguishes an inheritance normalisation from a real change.
     let parent = sb_dir
         .path()
         .parent()
@@ -679,10 +706,9 @@ fn windows_sandbox_reverts_dacls_on_exit() {
         .unwrap_or_else(|| "<no parent>".to_string());
 
     assert_eq!(
-        before, after,
-        "GrantGuard must revert every ACE it added; cwd DACL differs after a \
-         sandboxed run.\n\nparent (%TEMP%) DACL, for diagnosing \
-         explicit-vs-inherited:\n{parent}"
+        without_inheritance_marker(&before),
+        without_inheritance_marker(&after),
+        "a sandboxed run changed who may access the cwd.\n\nparent DACL:\n{parent}"
     );
 }
 
