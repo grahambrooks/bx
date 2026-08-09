@@ -15,6 +15,9 @@ pub mod platform;
 pub mod prune;
 pub mod sandbox;
 pub mod spec;
+// Internal plumbing rather than a pipeline step: picks the rustls crypto
+// provider the HTTP clients run on. Not part of the crate's public surface.
+pub(crate) mod tls;
 
 pub use error::{BxError, Result};
 

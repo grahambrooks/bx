@@ -45,17 +45,26 @@ jobs:
       - name: Clippy
         run: cargo clippy --all-targets -- -D warnings
 
-      # Unix builds the shell-script integration fixtures; the full suite runs.
-      - name: Test (unix)
-        if: matrix.name != 'windows'
+      # The same suite on every OS. This used to be split: the e2e fixtures
+      # were `#!/bin/sh` scripts, so Windows could only run `cargo test --lib`
+      # — 75 pure-function tests that never touched the fetch/extract/exec
+      # pipeline. The fixture is now a compiled executable
+      # (`tests/support/fixture_tool.rs`), so Windows runs everything,
+      # including the AppContainer sandbox tests that exercise the `win`
+      # backend rather than merely compiling it.
+      - name: Test
         run: cargo test --all-targets
 
-      # The end-to-end integration tests exec `#!/bin/sh` fixtures that Windows
-      # cannot launch, so the Windows job builds everything (compiling the
-      # AppContainer `win` backend) and runs the library unit tests — which
-      # include the `sandbox::appcontainer` plan-generation coverage.
-      - name: Build + lib tests (windows)
-        if: matrix.name == 'windows'
-        run: |
-          cargo build --all-targets
-          cargo test --lib
+      # Real-network TLS check, skipped by `cargo test` above via #[ignore].
+      # Nothing else in the suite performs a TLS handshake: the e2e harness
+      # serves plain HTTP from a local TcpListener. Run per-OS because root
+      # certificates come from the OS trust store on macOS/Windows and from
+      # rustls-native-certs on Linux — different code per runner.
+      #
+      # GITHUB_TOKEN lifts the unauthenticated api.github.com rate limit
+      # (60/hour, shared across hosted-runner egress IPs) so this fails on TLS
+      # regressions rather than on 403s. bx reads it from the environment.
+      - name: TLS smoke (real network)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: cargo test --test tls_smoke -- --ignored

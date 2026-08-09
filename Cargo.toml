@@ -9,16 +9,30 @@ repository = "https://github.com/grahambrooks/bx"
 
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }
-# HELD at 0.12 (do not bump to 0.13 without revisiting the TLS backend).
-# 0.13's `rustls` feature switched the default crypto provider from `ring` to
-# `aws-lc-rs` (via `rustls-platform-verifier`), which adds a C/assembly build
-# dependency — notably NASM for the `x86_64-pc-windows-msvc` release target,
-# which `ring` did not require. bx only makes plain HTTPS GETs to GitHub
-# (release JSON + asset download — see github.rs / fetch.rs), so it gains
-# nothing functional from aws-lc-rs and we keep the portable ring-based stack.
-# To move to 0.13: either add a NASM step to the Windows job in release.yml,
-# or use `rustls-no-provider` + install the ring CryptoProvider at startup.
-reqwest = { version = "0.13", default-features = false, features = ["json", "rustls-tls-native-roots", "stream"] }
+# TLS: rustls over `ring`, with the OS trust store for roots.
+#
+# 0.13 reworked the TLS features and there is no version-only upgrade path —
+# `rustls-tls-native-roots` (what we used on 0.12) no longer exists, so a bare
+# version bump fails to resolve. Two things changed:
+#
+#  1. Root certificates moved into `rustls-platform-verifier`, which both
+#     `rustls` and `rustls-no-provider` pull in unconditionally. It uses the
+#     OS verifier on macOS/Windows and `rustls-native-certs` elsewhere, so the
+#     old "native roots" behaviour is now the built-in default — nothing to
+#     opt into.
+#  2. The `rustls` feature hard-wires the `aws-lc-rs` crypto provider, which
+#     needs NASM to build for `x86_64-pc-windows-msvc`. `ring` does not, and
+#     bx only makes plain HTTPS GETs to GitHub (see github.rs / fetch.rs), so
+#     aws-lc-rs buys us nothing but a CI toolchain dependency.
+#
+# So: take `rustls-no-provider` (platform verifier, no crypto provider chosen)
+# and pin the provider ourselves by depending on rustls with `ring` and
+# installing it as the process default before the first client is built — see
+# `src/tls.rs`. Keep those two in sync: dropping the direct rustls dependency
+# leaves reqwest with no provider, and `ClientBuilder::build` then *panics*
+# rather than erroring. `tests/tls_smoke.rs` is what catches that.
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls-no-provider", "stream"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "fs", "io-util"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

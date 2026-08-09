@@ -18,7 +18,27 @@ use crate::spec::Spec;
 use directories::ProjectDirs;
 use std::path::{Path, PathBuf};
 
+/// The cache root. `BX_CACHE_DIR` overrides it outright.
+///
+/// The override exists because there was no cross-platform way to relocate
+/// the cache. `XDG_CACHE_HOME` was documented as the escape hatch, but
+/// `ProjectDirs::cache_dir` only consults it on Linux — on macOS it returns
+/// `~/Library/Caches` and on Windows `%LOCALAPPDATA%`, both unconditionally.
+/// The integration tests relied on that documented-but-absent isolation and
+/// were quietly reading and writing the developer's real cache, which let a
+/// pinned-ref test pass from a stale entry while fetching was entirely broken.
 pub fn root() -> Result<PathBuf> {
+    root_with(std::env::var_os("BX_CACHE_DIR"))
+}
+
+/// Inner form of [`root`], taking the override explicitly so it can be tested
+/// without mutating process-global environment state.
+fn root_with(override_dir: Option<std::ffi::OsString>) -> Result<PathBuf> {
+    if let Some(dir) = override_dir {
+        if !dir.is_empty() {
+            return Ok(PathBuf::from(dir));
+        }
+    }
     let dirs = ProjectDirs::from("dev", "bx", "bx").ok_or(BxError::NoCacheDir)?;
     Ok(dirs.cache_dir().to_path_buf())
 }
@@ -132,5 +152,18 @@ mod tests {
     fn sanitise_replaces_path_separators() {
         assert_eq!(sanitise("v1.0.0"), "v1.0.0");
         assert_eq!(sanitise("feature/branch"), "feature_branch");
+    }
+
+    #[test]
+    fn bx_cache_dir_overrides_the_platform_default() {
+        let overridden = root_with(Some("/tmp/bx-cache-override".into())).unwrap();
+        assert_eq!(overridden, PathBuf::from("/tmp/bx-cache-override"));
+    }
+
+    #[test]
+    fn empty_or_absent_override_falls_back_to_the_platform_default() {
+        let default = root_with(None).unwrap();
+        assert_eq!(root_with(Some("".into())).unwrap(), default);
+        assert_ne!(default, PathBuf::from("/tmp/bx-cache-override"));
     }
 }
