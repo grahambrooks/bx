@@ -198,7 +198,7 @@ mod win {
     use windows_sys::Win32::Foundation::{CloseHandle, LocalFree};
     use windows_sys::Win32::Security::Authorization::{
         BuildTrusteeWithSidW, GetNamedSecurityInfoW, SetEntriesInAclW, SetNamedSecurityInfoW,
-        DENY_ACCESS, EXPLICIT_ACCESS_W, SET_ACCESS, TRUSTEE_W,
+        DENY_ACCESS, EXPLICIT_ACCESS_W, REVOKE_ACCESS, SET_ACCESS, TRUSTEE_W,
     };
     use windows_sys::Win32::Security::Isolation::{
         CreateAppContainerProfile, DeriveAppContainerSidFromAppContainerName,
@@ -222,6 +222,8 @@ mod win {
     const GENERIC_EXECUTE: u32 = 0x2000_0000;
     /// CONTAINER_INHERIT_ACE | OBJECT_INHERIT_ACE — apply to the whole subtree.
     const SUB_CONTAINERS_AND_OBJECTS_INHERIT: u32 = 0x3;
+    /// `NO_INHERITANCE` — inheritance is irrelevant when revoking by trustee.
+    const NO_INHERITANCE: u32 = 0x0;
     const SE_GROUP_ENABLED: u32 = 0x4;
     /// `SE_FILE_OBJECT` for the Get/SetNamedSecurityInfo object type.
     const SE_FILE_OBJECT: i32 = 1;
@@ -368,18 +370,19 @@ mod win {
     /// current inheritance disposition.
     ///
     /// `SetNamedSecurityInfoW` given only `DACL_SECURITY_INFORMATION` does not
-    /// carry the `SE_DACL_PROTECTED` bit across, so a protected DACL comes back
-    /// unprotected: its explicit ACEs are dropped in favour of ones inherited
-    /// from the parent. Effective rights often look identical, which is why
-    /// this went unnoticed — but on a directory whose parent grants more than
-    /// its own ACEs did, it silently widens access, and it outlives the run.
-    /// Passing the flag explicitly on both the grant and the revert pins the
-    /// disposition to whatever it was before bx touched the path.
-    /// Fails closed. An earlier version returned 0 here when the control bits
-    /// could not be read, which silently reproduced the buggy behaviour and
-    /// made a broken fix indistinguishable from a wrong diagnosis in CI. If we
-    /// cannot read the disposition we cannot promise to restore it, and per
-    /// the Windows contract that is an error rather than a quiet downgrade.
+    /// carry the `SE_DACL_PROTECTED` bit across, so writing a DACL can change
+    /// whether the object inherits from its parent. Reasserting the captured
+    /// bit on every write pins the disposition to what it was beforehand.
+    ///
+    /// On its own this was *not* enough to make the revert faithful — see
+    /// `GrantGuard::revoke` — but it is still required: without it a protected
+    /// DACL would come back unprotected.
+    ///
+    /// Fails closed. An earlier version returned 0 when the control bits could
+    /// not be read, which silently reproduced the unfixed call and made a
+    /// broken fix indistinguishable from a wrong diagnosis in CI. If we cannot
+    /// read the disposition we cannot promise to restore it, and per the
+    /// Windows contract that is an error rather than a quiet downgrade.
     fn dacl_protection_flag(path: &str, sd: *mut c_void) -> Result<u32> {
         let mut control: u16 = 0;
         let mut revision: u32 = 0;
@@ -394,30 +397,120 @@ mod win {
         })
     }
 
-    /// Reverts the DACL of one path to the descriptor captured before the grant
-    /// was applied. Restoring runs on `Drop` so a panic or early return still
-    /// undoes the host-state mutation.
+    /// Removes the ACE the grant added, on `Drop`, so a panic or early return
+    /// still undoes the host-state mutation.
+    ///
+    /// This used to restore a snapshot of the DACL captured before the grant.
+    /// That cannot be faithful, and CI proved it three times: a Get→Set round
+    /// trip rewrites ACE provenance. `GetNamedSecurityInfoW` reports inherited
+    /// ACEs with `INHERITED_ACE` set, and `SetNamedSecurityInfoW` will not
+    /// re-establish those as explicit entries — the system recomputes
+    /// inheritance from the parent instead — so restoring the snapshot left the
+    /// same principals with the same rights but flipped from explicit to
+    /// inherited. Effective access matched, which is why it went unnoticed;
+    /// where a parent grants more than the child's own ACEs did, it would
+    /// silently widen access and outlive the run.
+    ///
+    /// Revoking by trustee touches only what we added. Note it removes *all*
+    /// ACEs for the package SID on this path, which is what we want: the SID is
+    /// derived from a bx-specific profile name, so nothing else should hold one.
     struct GrantGuard {
         path: Vec<u16>,
-        original_dacl: *mut ACL,
+        /// The package SID whose ACEs to revoke. Borrowed from `launch`, which
+        /// drops the guards before calling `FreeSid` — keep that ordering.
+        sid: PSID,
         security_descriptor: *mut c_void,
         new_dacl: *mut ACL,
         /// `DACL_SECURITY_INFORMATION` plus the captured protection flag.
         security_info: u32,
     }
 
-    impl Drop for GrantGuard {
-        fn drop(&mut self) {
-            unsafe {
+    impl GrantGuard {
+        /// Re-read the current DACL, drop every ACE belonging to `self.sid`,
+        /// and write the result back.
+        fn revoke(&mut self) -> Result<()> {
+            let mut current: *mut ACL = std::ptr::null_mut();
+            let mut sd: *mut c_void = std::ptr::null_mut();
+            let rc = unsafe {
+                GetNamedSecurityInfoW(
+                    self.path.as_ptr(),
+                    SE_FILE_OBJECT,
+                    DACL_SECURITY_INFORMATION,
+                    std::ptr::null_mut(),
+                    std::ptr::null_mut(),
+                    &mut current,
+                    std::ptr::null_mut(),
+                    &mut sd,
+                )
+            };
+            if rc != 0 {
+                return Err(BxError::Sandbox(format!(
+                    "GetNamedSecurityInfoW failed during revert (error={rc})"
+                )));
+            }
+
+            let mut trustee: TRUSTEE_W = unsafe { std::mem::zeroed() };
+            unsafe { BuildTrusteeWithSidW(&mut trustee, self.sid) };
+            trustee.TrusteeForm = TRUSTEE_IS_SID;
+            trustee.TrusteeType = TRUSTEE_IS_GROUP;
+
+            let ea = EXPLICIT_ACCESS_W {
+                grfAccessPermissions: 0,
+                grfAccessMode: REVOKE_ACCESS,
+                grfInheritance: NO_INHERITANCE,
+                Trustee: trustee,
+            };
+
+            let mut reverted: *mut ACL = std::ptr::null_mut();
+            let rc = unsafe { SetEntriesInAclW(1, &ea, current, &mut reverted) };
+            if rc != 0 {
+                unsafe {
+                    if !sd.is_null() {
+                        LocalFree(sd as _);
+                    }
+                }
+                return Err(BxError::Sandbox(format!(
+                    "SetEntriesInAclW failed during revert (error={rc})"
+                )));
+            }
+
+            let rc = unsafe {
                 SetNamedSecurityInfoW(
                     self.path.as_mut_ptr(),
                     SE_FILE_OBJECT,
                     self.security_info,
                     std::ptr::null_mut(),
                     std::ptr::null_mut(),
-                    self.original_dacl,
+                    reverted,
                     std::ptr::null_mut(),
-                );
+                )
+            };
+            unsafe {
+                if !sd.is_null() {
+                    LocalFree(sd as _);
+                }
+                if !reverted.is_null() {
+                    LocalFree(reverted as _);
+                }
+            }
+            if rc != 0 {
+                return Err(BxError::Sandbox(format!(
+                    "SetNamedSecurityInfoW failed during revert (error={rc})"
+                )));
+            }
+            Ok(())
+        }
+    }
+
+    impl Drop for GrantGuard {
+        fn drop(&mut self) {
+            // Drop cannot propagate, and leaving an ACE behind is exactly the
+            // host-state leak this type exists to prevent — so say so loudly
+            // rather than failing silently.
+            if let Err(e) = self.revoke() {
+                tracing::warn!("failed to revert sandbox ACE: {e}");
+            }
+            unsafe {
                 if !self.security_descriptor.is_null() {
                     LocalFree(self.security_descriptor as _);
                 }
@@ -524,7 +617,7 @@ mod win {
 
         Ok(GrantGuard {
             path: wpath,
-            original_dacl: old_dacl,
+            sid,
             security_descriptor: sd,
             new_dacl,
             security_info,

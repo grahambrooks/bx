@@ -666,9 +666,23 @@ fn windows_sandbox_reverts_dacls_on_exit() {
     );
 
     let after = icacls(sb_dir.path());
+
+    // The failure mode this has actually exhibited is subtle — the same
+    // principals with the same rights, flipped between explicit and inherited
+    // — and telling those apart needs the parent's ACL too. Whether %TEMP%
+    // carries inheritable ACEs is the fact that decides which mechanism is at
+    // work, so put it in the message rather than guessing at it again.
+    let parent = sb_dir
+        .path()
+        .parent()
+        .map(icacls)
+        .unwrap_or_else(|| "<no parent>".to_string());
+
     assert_eq!(
         before, after,
-        "GrantGuard must revert every ACE it added; cwd DACL differs after a sandboxed run"
+        "GrantGuard must revert every ACE it added; cwd DACL differs after a \
+         sandboxed run.\n\nparent (%TEMP%) DACL, for diagnosing \
+         explicit-vs-inherited:\n{parent}"
     );
 }
 
