@@ -30,6 +30,11 @@ pub struct Release {
 pub struct Asset {
     pub name: String,
     pub browser_download_url: String,
+    /// The API URL for the asset. Private repositories only serve assets through
+    /// it (with a token and `Accept: application/octet-stream`); their
+    /// `browser_download_url` answers 404 even to an authenticated request.
+    #[serde(default)]
+    pub url: String,
     pub size: u64,
     pub content_type: Option<String>,
 }

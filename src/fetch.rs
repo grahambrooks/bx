@@ -112,12 +112,29 @@ async fn download(asset: &Asset, into: &Path) -> Result<PathBuf> {
         .build()
         .map_err(BxError::from)?;
 
-    let response = client.get(&asset.browser_download_url).send().await?;
+    // With a token, download through the API so private repositories work; its
+    // redirect to the storage host drops the Authorization header (reqwest
+    // strips it on cross-host redirects).
+    let token = std::env::var("GITHUB_TOKEN").ok().filter(|t| !t.is_empty());
+    let (url, request) = match token {
+        Some(token) if !asset.url.is_empty() => (
+            asset.url.as_str(),
+            client
+                .get(&asset.url)
+                .bearer_auth(token)
+                .header(reqwest::header::ACCEPT, "application/octet-stream"),
+        ),
+        _ => (
+            asset.browser_download_url.as_str(),
+            client.get(&asset.browser_download_url),
+        ),
+    };
+    let response = request.send().await?;
     if !response.status().is_success() {
         return Err(BxError::GitHubApi(format!(
             "download failed: {} {}",
             response.status(),
-            asset.browser_download_url
+            url
         )));
     }
 

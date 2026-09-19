@@ -62,6 +62,11 @@ fn is_noise(name: &str) -> bool {
     if lower.ends_with(".mcpb") {
         return true;
     }
+    // Archives bx cannot unpack (see fetch::extract_or_place): picking one would
+    // cache the compressed file itself under the binary's name.
+    if lower.ends_with(".tar.xz") || lower.ends_with(".tar.bz2") {
+        return true;
+    }
     false
 }
 
@@ -136,6 +141,7 @@ mod tests {
         Asset {
             name: name.to_string(),
             browser_download_url: format!("https://example.com/{name}"),
+            url: String::new(),
             size,
             content_type: None,
         }
@@ -244,5 +250,18 @@ mod tests {
         ];
         let picked = select(&linux_x64(), "v1", &assets).unwrap();
         assert_eq!(picked.name, "tool-full-linux-x64.tar.gz");
+    }
+
+    #[test]
+    fn skips_archives_bx_cannot_extract() {
+        let assets = vec![
+            asset("tool-x86_64-unknown-linux-gnu.tar.xz", 9_000_000),
+            asset("tool-x86_64-unknown-linux-gnu.tar.gz", 100),
+        ];
+        let picked = select(&linux_x64(), "v1", &assets).unwrap();
+        assert_eq!(picked.name, "tool-x86_64-unknown-linux-gnu.tar.gz");
+
+        let xz_only = vec![asset("tool-x86_64-unknown-linux-gnu.tar.xz", 100)];
+        assert!(select(&linux_x64(), "v1", &xz_only).is_err());
     }
 }
