@@ -212,19 +212,17 @@ make test       # 75 unit + 6 integration
 
 ## Releasing
 
-Releases are calver-tagged (`vYYYY.M.D`) and built by
+Releases are calver-tagged (`vYYYY.M.D`): pushing the tag runs
 [`.github/workflows/release.yml`](.github/workflows/release.yml).
 
 ```sh
-make release                    # triggers today's date
+make release                    # tags origin/main with today's date and pushes the tag
 make release VERSION=2026.5.23  # explicit version
 ```
 
-`make release` requires the [`gh`](https://cli.github.com) CLI and triggers
-the workflow, which builds `darwin-arm64`, `linux-x64`, `linux-arm64`, and
-`windows-x64` artifacts, publishes a GitHub release, and pushes a Homebrew
-formula bump in [`Formula/bx.rb`](Formula/bx.rb). Intel Macs are not a
-supported build target.
+The workflow builds `bx-<tag>-<target>` archives for macOS and Linux (x86_64 and
+aarch64) and Windows x86_64, publishes them with `SHA256SUMS` on the GitHub
+release, and merges a PR that regenerates [`Formula/bx.rb`](Formula/bx.rb).
 
 ## License
 

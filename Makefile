@@ -1,7 +1,7 @@
 .DEFAULT_GOAL := help
 
 # Optional version override consumed by `make release`, e.g. `make release VERSION=2026.5.23`.
-# When empty, the release workflow falls back to today's date as YYYY.M.D.
+# When empty, `make release` uses today's UTC date as YYYY.M.D.
 VERSION ?=
 
 .PHONY: help build test release clippy fmt clean
@@ -25,13 +25,12 @@ fmt: ## Format the source tree with rustfmt.
 clean: ## Remove cargo build artifacts.
 	cargo clean
 
-release: ## Trigger the release workflow. Optional: VERSION=YYYY.M.D
-	@command -v gh >/dev/null 2>&1 || { \
-	  echo "error: gh CLI not found (https://cli.github.com)" >&2; exit 1; }
-	@if [ -n "$(VERSION)" ]; then \
-	  echo "Triggering release v$(VERSION)..."; \
-	  gh workflow run release.yml -f version="$(VERSION)"; \
-	else \
-	  echo "Triggering release with today's calver..."; \
-	  gh workflow run release.yml; \
-	fi
+release: ## Tag origin/main as vVERSION and push the tag (runs the release workflow). Optional: VERSION=YYYY.M.D
+	@set -e; \
+	V="$(VERSION)"; [ -n "$$V" ] || V="$$(date -u +%Y.%-m.%-d)"; \
+	git fetch --quiet origin main --tags; \
+	if git rev-parse -q --verify "refs/tags/v$$V" >/dev/null; then \
+	  echo "error: tag v$$V already exists" >&2; exit 1; fi; \
+	echo "Tagging origin/main as v$$V..."; \
+	git tag "v$$V" origin/main; \
+	git push origin "v$$V"
