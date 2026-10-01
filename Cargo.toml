@@ -1,6 +1,6 @@
 [package]
 name = "bx"
-version = "2026.9.3"
+version = "2026.10.1"
 edition = "2021"
 rust-version = "1.98.1"
 description = "Run binaries from GitHub releases. npx for compiled tools, with MCP-server smarts."
