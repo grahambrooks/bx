@@ -1,0 +1,29 @@
+.gitignore
+  s_3af201839d09d6::t_d0629ce94a2ecf 19
+CLAUDE.md
+  s_3af201839d09d6::t_26395b61f103af 15-16,100
+Makefile
+  s_3af201839d09d6::t_5fa9a7c4016961 3-4,6,10,12-15,17-18,20-21,23-35
+README.md
+  s_3af201839d09d6::t_b70dd328516e7c 211-212,221-222,225-227
+prek.toml
+  s_3af201839d09d6::t_3b04ef68ea7d16 1-2,5-6,14-15,18-22,32-33,37,39-40
+release.mk
+  s_3af201839d09d6::t_fe78c6bd35695e 1-48
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ed29d29d607937b4995f4fc55e25a5a8cbeaee26",
+  "prompts": {},
+  "sessions": {
+    "s_3af201839d09d6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ca62a504-f3e7-484c-9e2d-47cfc6cd0491",
+        "model": "claude-opus-5-5"
+      },
+      "human_author": "Graham Brooks <graham@grahambrooks.com>"
+    }
+  }
+}
