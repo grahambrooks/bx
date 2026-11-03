@@ -1,0 +1,45 @@
+.github/workflows/ci.yml
+  s_3af201839d09d6::t_3cabcdae22560e 4,7-15,37-38,60,63,73,87-121
+Cargo.lock
+  s_3af201839d09d6::t_b869eb088f3021 1-2093
+Cargo.toml
+  s_3af201839d09d6::t_a696ded38734a1 4-5
+rust-toolchain.toml
+  s_3af201839d09d6::t_dd43f3e04a244c 1-4
+src/cache.rs
+  s_3af201839d09d6::t_b6fd695fe47284 37-40
+src/exec.rs
+  s_3af201839d09d6::t_8ec0604dce1630 48,55,200-201,207,214-216
+src/github.rs
+  s_3af201839d09d6::t_68ee242c6ab157 103-108
+src/lib.rs
+  s_3af201839d09d6::t_4a537bb418bce0 58-62
+src/main.rs
+  s_3af201839d09d6::t_a2de2a48fd6e61 13,181
+src/platform.rs
+  s_3af201839d09d6::t_3e88d8c4d06152 36,46
+src/sandbox/appcontainer.rs
+  s_3af201839d09d6::t_a4c0b2a0f64c7d 167-174
+src/sandbox/bwrap.rs
+  s_3af201839d09d6::t_ac7b238cd3167c 160-163
+src/sandbox/mod.rs
+  s_3af201839d09d6::t_33b8a15d535e36 242-245
+tests/end_to_end.rs
+  s_3af201839d09d6::t_8f1f5308ed95c0 22
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a88f51a2d28cc2aeb3f9490dbb14d9edea79ec5e",
+  "prompts": {},
+  "sessions": {
+    "s_3af201839d09d6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ca62a504-f3e7-484c-9e2d-47cfc6cd0491",
+        "model": "unknown"
+      },
+      "human_author": "Graham Brooks <graham@grahambrooks.com>"
+    }
+  }
+}
