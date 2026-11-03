@@ -34,10 +34,10 @@ pub fn root() -> Result<PathBuf> {
 /// Inner form of [`root`], taking the override explicitly so it can be tested
 /// without mutating process-global environment state.
 fn root_with(override_dir: Option<std::ffi::OsString>) -> Result<PathBuf> {
-    if let Some(dir) = override_dir {
-        if !dir.is_empty() {
-            return Ok(PathBuf::from(dir));
-        }
+    if let Some(dir) = override_dir
+        && !dir.is_empty()
+    {
+        return Ok(PathBuf::from(dir));
     }
     let dirs = ProjectDirs::from("dev", "bx", "bx").ok_or(BxError::NoCacheDir)?;
     Ok(dirs.cache_dir().to_path_buf())

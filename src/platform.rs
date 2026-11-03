@@ -33,7 +33,7 @@ impl Platform {
                 return Err(BxError::UnsupportedPlatform {
                     os: other.to_string(),
                     arch: std::env::consts::ARCH.to_string(),
-                })
+                });
             }
         };
         let arch = match std::env::consts::ARCH {
@@ -43,7 +43,7 @@ impl Platform {
                 return Err(BxError::UnsupportedPlatform {
                     os: std::env::consts::OS.to_string(),
                     arch: other.to_string(),
-                })
+                });
             }
         };
         Ok(Self { os, arch })

@@ -100,12 +100,12 @@ fn build_client() -> Result<reqwest::Client> {
         reqwest::header::HeaderValue::from_static("2022-11-28"),
     );
 
-    if let Ok(token) = std::env::var("GITHUB_TOKEN") {
-        if !token.is_empty() {
-            let value = format!("Bearer {token}");
-            if let Ok(header) = reqwest::header::HeaderValue::from_str(&value) {
-                headers.insert(reqwest::header::AUTHORIZATION, header);
-            }
+    if let Ok(token) = std::env::var("GITHUB_TOKEN")
+        && !token.is_empty()
+    {
+        let value = format!("Bearer {token}");
+        if let Ok(header) = reqwest::header::HeaderValue::from_str(&value) {
+            headers.insert(reqwest::header::AUTHORIZATION, header);
         }
     }
 

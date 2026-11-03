@@ -45,14 +45,14 @@ fn exec_status(cmd: &mut Command) -> Result<i32> {
 fn run_sandboxed(binary: &Path, args: &[String], policy: &Policy) -> Result<i32> {
     use crate::error::BxError;
     use crate::sandbox::seatbelt;
-    use std::ffi::{c_char, CStr, CString};
+    use std::ffi::{CStr, CString, c_char};
     use std::os::unix::process::CommandExt;
 
     // libsandbox is shipped on every macOS; `sandbox_init` is deprecated in
     // the headers but still used by first-party apps (and Chromium) through
     // macOS 15+.
     #[link(name = "sandbox")]
-    extern "C" {
+    unsafe extern "C" {
         fn sandbox_init(
             profile: *const c_char,
             flags: u64,
@@ -197,23 +197,23 @@ mod win {
     use std::os::windows::ffi::OsStrExt;
     use windows_sys::Win32::Foundation::{CloseHandle, LocalFree};
     use windows_sys::Win32::Security::Authorization::{
-        BuildTrusteeWithSidW, GetNamedSecurityInfoW, SetEntriesInAclW, SetNamedSecurityInfoW,
-        DENY_ACCESS, EXPLICIT_ACCESS_W, REVOKE_ACCESS, SET_ACCESS, TRUSTEE_W,
+        BuildTrusteeWithSidW, DENY_ACCESS, EXPLICIT_ACCESS_W, GetNamedSecurityInfoW, REVOKE_ACCESS,
+        SET_ACCESS, SetEntriesInAclW, SetNamedSecurityInfoW, TRUSTEE_W,
     };
     use windows_sys::Win32::Security::Isolation::{
         CreateAppContainerProfile, DeriveAppContainerSidFromAppContainerName,
     };
     use windows_sys::Win32::Security::{
-        AllocateAndInitializeSid, FreeSid, GetSecurityDescriptorControl, ACL, PSID,
+        ACL, AllocateAndInitializeSid, FreeSid, GetSecurityDescriptorControl, PSID,
         SECURITY_CAPABILITIES, SID_AND_ATTRIBUTES, SID_IDENTIFIER_AUTHORITY,
     };
     use windows_sys::Win32::System::Console::{
         GetStdHandle, STD_ERROR_HANDLE, STD_INPUT_HANDLE, STD_OUTPUT_HANDLE,
     };
     use windows_sys::Win32::System::Threading::{
-        CreateProcessW, DeleteProcThreadAttributeList, GetExitCodeProcess,
-        InitializeProcThreadAttributeList, UpdateProcThreadAttribute, WaitForSingleObject,
-        EXTENDED_STARTUPINFO_PRESENT, PROCESS_INFORMATION, STARTUPINFOEXW,
+        CreateProcessW, DeleteProcThreadAttributeList, EXTENDED_STARTUPINFO_PRESENT,
+        GetExitCodeProcess, InitializeProcThreadAttributeList, PROCESS_INFORMATION, STARTUPINFOEXW,
+        UpdateProcThreadAttribute, WaitForSingleObject,
     };
 
     // --- stable ABI constants (see module note) ---

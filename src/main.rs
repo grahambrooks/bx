@@ -10,9 +10,9 @@
 //!   bx --refresh grahambrooks/symgraph serve
 //!   bx prune --keep 3
 
+use bx::BxError;
 use bx::prune::{self, PruneOpts};
 use bx::spec::Spec;
-use bx::BxError;
 use clap::{Args, Parser, Subcommand};
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -178,7 +178,7 @@ fn report_error(e: &BxError) {
 }
 
 fn init_logging() {
-    use tracing_subscriber::{fmt, EnvFilter};
+    use tracing_subscriber::{EnvFilter, fmt};
     let filter = EnvFilter::try_from_env("BX_LOG").unwrap_or_else(|_| EnvFilter::new("warn"));
     let _ = fmt()
         .with_env_filter(filter)

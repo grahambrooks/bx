@@ -157,8 +157,9 @@ mod tests {
         let mut p = policy();
         p.denied_paths = vec!["/work/.env".into()];
         let a = build_args(&p, "/work", "tool", &[]);
-        assert!(a
-            .windows(2)
-            .any(|w| w[0] == "--tmpfs" && w[1] == "/work/.env"));
+        assert!(
+            a.windows(2)
+                .any(|w| w[0] == "--tmpfs" && w[1] == "/work/.env")
+        );
     }
 }

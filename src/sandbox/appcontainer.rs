@@ -164,12 +164,14 @@ mod tests {
         let mut p = base();
         p.allow_local_network = true;
         let plan = build_plan(&p, r"C:\cache\tool.exe");
-        assert!(plan
-            .capabilities
-            .contains(&Capability::PrivateNetworkClientServer));
-        assert!(plan
-            .capabilities
-            .contains(&Capability::InternetClientServer));
+        assert!(
+            plan.capabilities
+                .contains(&Capability::PrivateNetworkClientServer)
+        );
+        assert!(
+            plan.capabilities
+                .contains(&Capability::InternetClientServer)
+        );
     }
 
     #[test]

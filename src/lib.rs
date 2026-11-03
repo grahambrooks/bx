@@ -55,13 +55,11 @@ pub async fn run(
     }
 
     // Fast path for pinned refs.
-    if !refresh {
-        if let spec::Ref::Tag(tag) = &spec.reference {
-            let cache_dir = cache::binary_dir(spec, tag)?;
-            if let Ok(binary) = find_binary(&cache_dir, spec) {
-                tracing::debug!(?binary, "cache hit (pinned ref)");
-                return exec::run(&binary, args, policy.as_ref());
-            }
+    if !refresh && let spec::Ref::Tag(tag) = &spec.reference {
+        let cache_dir = cache::binary_dir(spec, tag)?;
+        if let Ok(binary) = find_binary(&cache_dir, spec) {
+            tracing::debug!(?binary, "cache hit (pinned ref)");
+            return exec::run(&binary, args, policy.as_ref());
         }
     }
 

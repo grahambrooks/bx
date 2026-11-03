@@ -1,8 +1,8 @@
 [package]
 name = "bx"
 version = "2026.11.1"
-edition = "2021"
-rust-version = "1.99.0"
+edition = "2024"
+rust-version = "1.99.1"
 description = "Run binaries from GitHub releases. npx for compiled tools, with MCP-server smarts."
 license = "MIT"
 repository = "https://github.com/grahambrooks/bx"
