@@ -12,6 +12,8 @@ cargo test --test end_to_end -- --nocapture      # see binary stdout/stderr
 cargo test spec::tests::with_tag                 # single unit test by path
 cargo clippy --all-targets -- -D warnings
 cargo fmt
+make check                                       # the CI gate (fmt, clippy, tests, TLS smoke); run before pushing
+make hooks                                       # install prek git hooks: fast checks on commit, make check on push
 ```
 
 Run the binary locally without installing:
@@ -95,4 +97,4 @@ All errors are `BxError` variants with `thiserror`. `main.rs` walks the `source(
 
 ## Releasing + Homebrew
 
-Releases are cut by pushing a CalVer tag (`vYYYY.M.D`) — `make release` (optionally `VERSION=YYYY.M.D`) tags `origin/main` and pushes it. The tag runs `.github/workflows/release.yml`, the standard release-kit v2 workflow (byte-identical across grahambrooks tools; per-repo config in `.release.env`, logic in `scripts/release.py` — never edit either per repo). It stamps the tag's version into `Cargo.toml`, builds `bx-<tag>-<target>.tar.gz` for `aarch64`/`x86_64` `apple-darwin` and `unknown-linux-gnu` plus `bx-<tag>-x86_64-pc-windows-msvc.zip`, publishes `SHA256SUMS`, and opens+merges one PR that regenerates `Formula/bx.rb` and bumps `Cargo.toml`.
+Releases are cut by pushing a CalVer tag (`vYYYY.M.D`) — `make release` (from release-kit's `release.mk`; `make release-dry` previews) tags `origin/main` with today's UTC date, bumping the last number while that tag exists, and pushes only the tag. The tag runs `.github/workflows/release.yml`, the standard release-kit v2 workflow (byte-identical across grahambrooks tools; per-repo config in `.release.env`, logic in `scripts/release.py` — never edit either per repo). It stamps the tag's version into `Cargo.toml`, builds `bx-<tag>-<target>.tar.gz` for `aarch64`/`x86_64` `apple-darwin` and `unknown-linux-gnu` plus `bx-<tag>-x86_64-pc-windows-msvc.zip`, publishes `SHA256SUMS`, and opens+merges one PR that regenerates `Formula/bx.rb` and bumps `Cargo.toml`.

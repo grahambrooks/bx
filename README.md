@@ -208,6 +208,8 @@ JSON-RPC).
 make            # list available targets
 make build      # cargo build --release
 make test       # 75 unit + 6 integration
+make check      # the CI gate: fmt, clippy, tests, TLS smoke (needs network)
+make hooks      # install the prek git hooks (make check runs before push)
 ```
 
 ## Releasing
@@ -216,9 +218,12 @@ Releases are calver-tagged (`vYYYY.M.D`): pushing the tag runs
 [`.github/workflows/release.yml`](.github/workflows/release.yml).
 
 ```sh
-make release                    # tags origin/main with today's date and pushes the tag
-make release VERSION=2026.5.23  # explicit version
+make release-dry   # show what would be tagged
+make release       # tags origin/main with today's date and pushes the tag
 ```
+
+A second release the same day takes the next free number (`v2026.5.23` →
+`v2026.5.24`).
 
 The workflow builds `bx-<tag>-<target>` archives for macOS and Linux (x86_64 and
 aarch64) and Windows x86_64, publishes them with `SHA256SUMS` on the GitHub
