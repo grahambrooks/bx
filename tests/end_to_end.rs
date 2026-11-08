@@ -413,6 +413,9 @@ fn stdio_passes_through_to_child() {
 #[cfg(target_os = "macos")]
 #[test]
 fn macos_sandbox_strict_applies_and_passes_stdio() {
+    if already_sandboxed("macos_sandbox_strict_applies_and_passes_stdio") {
+        return;
+    }
     let tarball = make_tarball("sb-echo");
     let tarball_size = tarball.len() as u64;
     let asset_name = format!("sb-echo-v1.0.0-{}.tar.gz", host_platform_slug());
@@ -498,6 +501,24 @@ fn serve(listener: TcpListener, routes: Vec<(String, Vec<u8>, &'static str)>) {
     });
 }
 
+/// macOS only: true when this test already runs inside a Seatbelt sandbox
+/// (sustain sets `SUSTAIN_SANDBOXED` for the builds and tests it runs).
+/// macOS won't nest sandboxes, so `sandbox_init` would fail with EPERM and
+/// the test would report a broken backend that isn't broken. Like the bwrap
+/// skip, it refuses to skip on CI, where nothing sets it.
+#[cfg(target_os = "macos")]
+fn already_sandboxed(test: &str) -> bool {
+    if std::env::var_os("SUSTAIN_SANDBOXED").is_none() {
+        return false;
+    }
+    assert!(
+        std::env::var_os("CI").is_none(),
+        "{test}: SUSTAIN_SANDBOXED is set on CI. Refusing to skip silently."
+    );
+    eprintln!("skipping {test}: already sandboxed, and macOS won't nest sandboxes");
+    true
+}
+
 /// Linux only: verify `bwrap` is not just present but actually *usable* (an
 /// unprivileged user namespace can be created). A developer machine without
 /// user-namespace support should skip the enforcement test rather than fail
@@ -555,6 +576,10 @@ fn require_bwrap_or_skip(test: &str) -> bool {
 fn sandbox_strict_denies_out_of_policy_write() {
     #[cfg(target_os = "linux")]
     if !require_bwrap_or_skip("sandbox_strict_denies_out_of_policy_write") {
+        return;
+    }
+    #[cfg(target_os = "macos")]
+    if already_sandboxed("sandbox_strict_denies_out_of_policy_write") {
         return;
     }
 
